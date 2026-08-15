@@ -287,10 +287,9 @@ class GoatDuel:
                     self.play(override)
                     continue
             if responder == "select_unselect_card":
-                # Built directly rather than picked from legal_actions(): the
-                # action space's passive entry is emitted first and the trailing
-                # de-duplication then swallows the concrete "index 0" choice, so
-                # index 0 is unreachable by label. See GOAT_FORMAT.md.
+                # Built by index rather than matched by label: the passive entry
+                # shares its payload with "select index 0", so their labels are
+                # merged and a substring match would be ambiguous.
                 decision = self.decision()
                 if decision.get("selectable_cards"):
                     self.play(ActionChoice(responder, {"index": 0}, "select 0"))

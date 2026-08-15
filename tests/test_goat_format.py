@@ -192,6 +192,81 @@ def test_normalize_name_folds_format_qualifiers_and_punctuation(raw: str, expect
     assert normalize_name(raw) == expected
 
 
+class _FakePending:
+    msg_name = "select_unselect_card"
+    player = 0
+
+
+def _action_set(decision: dict, passive_args: dict):
+    """Run the action space against a synthetic prompt."""
+
+    from ygobench.agents.action_space import legal_actions_from_pending
+
+    class FakeState:
+        def build_decision(self, pending, card_db):
+            return decision
+
+    class FakeReplay:
+        def _pick_passive_opponent_response(self, pending):
+            return decision["responder"], passive_args
+
+    return legal_actions_from_pending(
+        _FakePending(), card_db=None, replay_module=FakeReplay(), state_module=FakeState()
+    )
+
+
+def test_passive_entry_never_hides_a_concrete_choice() -> None:
+    """The passive response can share a payload with a real choice.
+
+    For select/unselect prompts the upstream passive response is literally
+    "pick index 0".  De-duplicating first-wins would delete that choice from the
+    action set, leaving the first selectable card unreachable and making the
+    passive entry silently perform a selection under a misleading label.
+    """
+
+    decision = {
+        "responder": "select_unselect_card",
+        "selectable_cards": [{"name": "Magician of Faith"}, {"name": "Spirit Reaper"}],
+        "selected_cards": [],
+        "finishable": False,
+    }
+    actions = _action_set(decision, {"index": 0})
+
+    payloads = [action.arguments for action in actions]
+    assert {"index": 0} in payloads
+    assert {"index": 1} in payloads
+
+    merged = next(action for action in actions if action.arguments == {"index": 0})
+    assert "passive / first legal" in merged.label
+    assert "Magician of Faith" in merged.label
+
+    # Every selectable card is reachable by name.
+    labels = " | ".join(action.label for action in actions)
+    assert "Magician of Faith" in labels and "Spirit Reaper" in labels
+
+
+def test_select_unselect_labels_distinguish_select_from_unselect() -> None:
+    decision = {
+        "responder": "select_unselect_card",
+        "selectable_cards": [{"name": "Spirit Reaper"}],
+        "selected_cards": [{"name": "Magician of Faith"}],
+        "finishable": True,
+    }
+    actions = _action_set(decision, {"index": None})
+    labels = [action.label for action in actions]
+
+    assert any(label == "select Spirit Reaper" for label in labels)
+    assert any(label == "unselect Magician of Faith" for label in labels)
+    # index 0 selects, index 1 toggles the already-selected card back off.
+    by_index = {
+        action.arguments.get("index"): action.label
+        for action in actions
+        if "index" in action.arguments
+    }
+    assert by_index[0].endswith("select Spirit Reaper")
+    assert by_index[1] == "unselect Magician of Faith"
+
+
 def test_reference_decks_have_the_declared_shape() -> None:
     assert len(REFERENCE_DECKS) == 10
     assert len({deck.id for deck in REFERENCE_DECKS}) == 10

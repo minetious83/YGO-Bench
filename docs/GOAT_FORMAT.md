@@ -139,15 +139,24 @@ Findings from batch 1, all observed from the engine:
 Note for scenario authors: `Thunder Dragon` is **LIGHT**, not DARK -- which is
 why GOAT Chaos decks run it as LIGHT fodder.
 
-### Action-space defect found while building the suite
+### Action-space defect found while building the suite (fixed)
 
-`legal_actions_from_pending` puts the upstream passive response first and then
-de-duplicates by `(tool, arguments)`, keeping the first entry. For
-`select_unselect_card` prompts (Chaos Sorcerer's banish cost, for example) the
-passive response is either `index: None` -- which *cancels* the effect -- or
-`index: 0`, which collides with the concrete "select card 0" choice and removes
-it from the list. An agent therefore cannot reach the first selectable card by
-label, and picking the first listed action silently aborts the summon. The
-harness works around it by constructing the response directly; the action space
-itself has not been changed. This affects LLM agents on any card with a
-select/unselect cost and should be fixed before the AI-vs-AI benchmark layer.
+`legal_actions_from_pending` emits the upstream passive response first and then
+de-duplicates by `(tool, arguments)`. For `select_unselect_card` prompts --
+Chaos Sorcerer's banish cost, for example -- the passive response is literally
+"pick index 0", so first-wins de-duplication deleted the concrete choice for the
+first selectable card. The card became unreachable by label, and the entry
+labelled "passive / first legal" silently performed a selection instead of
+declining. Any card with a select/unselect cost was affected, LLM agents
+included.
+
+Fixed in two parts:
+
+* When a concrete choice collides with the passive entry, the labels are merged
+  (`passive / first legal / select Magician of Faith`) rather than the choice
+  being dropped, so every payload stays in the action set and stays findable.
+* Select/unselect choices are now labelled by card name and by whether they
+  select or unselect, instead of `card index N`.
+
+Covered by unit tests that drive the action space with a synthetic prompt, so
+they run without a built engine.

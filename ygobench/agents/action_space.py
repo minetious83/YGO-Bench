@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from itertools import combinations
 from typing import Any
 
@@ -132,6 +133,9 @@ def _bounded_combinations(size: int, min_count: int, max_count: int, limit: int 
                 return
 
 
+PASSIVE_LABEL = "passive / first legal"
+
+
 def legal_actions_from_pending(
     pending: Any,
     *,
@@ -154,7 +158,7 @@ def legal_actions_from_pending(
     if responder == "select_place":
         count = int(decision.get("count", 1))
         passive_args = {"places": list(decision.get("places", []))[:count]}
-    actions: list[ActionChoice] = [_choice(passive_tool, passive_args, "passive / first legal")]
+    actions: list[ActionChoice] = [_choice(passive_tool, passive_args, PASSIVE_LABEL)]
 
     if responder in {"select_idlecmd", "select_battlecmd"}:
         for option in decision.get("choices", []):
@@ -188,12 +192,15 @@ def legal_actions_from_pending(
         if decision.get("cancelable"):
             actions.append(_choice(responder, {"indices": [], "cancel": True}, "cancel"))
     elif responder == "select_unselect_card":
-        size = len(decision.get("selectable_cards", [])) + len(
-            decision.get("selected_cards", [])
-        )
-        actions.extend(
-            _choice(responder, {"index": idx}, f"card index {idx}") for idx in range(size)
-        )
+        # Index is into ``selectable_cards`` followed by ``selected_cards``;
+        # picking an already-selected card unselects it.  Label by card name so
+        # an agent can choose one without counting positions.
+        selectable = list(decision.get("selectable_cards", []))
+        selected = list(decision.get("selected_cards", []))
+        for idx, card in enumerate([*selectable, *selected]):
+            name = card.get("name", f"card {idx}")
+            verb = "select" if idx < len(selectable) else "unselect"
+            actions.append(_choice(responder, {"index": idx}, f"{verb} {name}"))
         if decision.get("finishable") or decision.get("cancelable"):
             actions.append(_choice(responder, {"index": None}, "finish"))
     elif responder == "select_chain":
@@ -242,8 +249,17 @@ def legal_actions_from_pending(
             for hand, label in ((1, "rock"), (2, "scissors"), (3, "paper"))
         )
 
+    # De-duplicate by payload, keeping the first position.  The passive entry is
+    # emitted first and can carry the same payload as a concrete choice (the
+    # upstream passive response for a select/unselect prompt is literally
+    # "pick index 0"), so a plain first-wins drop would delete that choice from
+    # the action set and leave it unreachable.  Merge the labels instead.
     unique: dict[tuple[str, str], ActionChoice] = {}
     for action in actions:
         key = (action.tool, json.dumps(action.arguments, sort_keys=True))
-        unique.setdefault(key, action)
+        existing = unique.get(key)
+        if existing is None:
+            unique[key] = action
+        elif existing.label == PASSIVE_LABEL and action.label:
+            unique[key] = replace(existing, label=f"{PASSIVE_LABEL} / {action.label}")
     return tuple(unique.values())

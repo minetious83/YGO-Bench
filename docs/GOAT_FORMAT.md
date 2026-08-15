@@ -115,7 +115,8 @@ so a scenario can put known cards in hand and then play legal actions through
 the same call path the duel runner uses. It chooses deck contents and order and
 nothing else -- no engine interaction is bypassed.
 
-Findings from batch 1, all observed from the engine:
+Findings from batch 1 (legacy priority, Scapegoat, Metamorphosis, Chaos
+Sorcerer), all observed from the engine:
 
 * **Legacy ignition priority is implemented.** After Normal Summoning Breaker
   the Magical Warrior, GOAT offers its ignition effect to the summoning player
@@ -160,3 +161,27 @@ Fixed in two parts:
 
 Covered by unit tests that drive the action space with a synthetic prompt, so
 they run without a built engine.
+
+### Batch 2 findings — board control
+
+* **Thousand-Eyes Restrict** equips the opponent's monster on summon: the
+  monster leaves their field entirely and TER takes on its ATK/DEF (1900/1600
+  from a Luster Dragon). The equip is an optional trigger, so an agent that
+  declines the chain window keeps a 0/0 TER and leaves the monster where it was.
+* **Book of Moon** flips a face-up monster to face-down Defense, and the
+  flipped card's identity stops being visible to the opponent -- hidden
+  information is re-established, not merely hidden at draw time.
+* **Creature Swap** exchanges control one monster each way, Sheep Tokens
+  included.
+* **Nobleman of Crossout** banishes a Set Flip monster *and every same-named
+  copy in the Deck* (verified: three Magician of Faith banished, deck count down
+  by two) and sends nothing to the graveyard.
+* **Tsukuyomi**: the Flip Summon is offered as a reposition of the Set monster;
+  its FLIP effect turns a face-up monster face-down, and the Spirit returns to
+  the hand at the End Phase.
+* **Sinister Serpent** is offered from the graveyard specifically in the
+  Standby Phase, and the test pins the phase so an any-time recovery would fail.
+
+Still queued for batch 3: Ring of Destruction, Jinzo/trap suppression, Call of
+the Haunted lifecycle, Spirit Reaper, Damage Step activation restrictions and
+chain construction/resolution order.

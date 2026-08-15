@@ -14,7 +14,7 @@ behaviour -- not to encode the expected ruling in Python.
 from __future__ import annotations
 
 import pytest
-from goat_harness import GoatDuel, stack, toolbox
+from goat_harness import GoatDuel, card_id, stack, toolbox
 
 from ygobench.engine.upstream import UpstreamLayout
 
@@ -267,3 +267,208 @@ def test_metamorphosis_from_chaos_sorcerer_summons_ryu_senshi() -> None:
         duel.resolve(chooser=take_ryu_senshi)
 
         assert _monsters(duel) == ["Ryu Senshi"]
+
+
+# --------------------------------------------------------------------------
+# Batch 2: board-control interactions
+# --------------------------------------------------------------------------
+
+
+def prefer(*names: str):
+    """Chooser that picks the first offered action matching any of ``names``."""
+
+    def chooser(responder, duel):
+        if responder in {"select_card", "select_chain", "select_tribute"}:
+            for name in names:
+                needle = name.casefold()
+                match = next(
+                    (a for a in duel.legal_actions() if needle in (a.label or "").casefold()),
+                    None,
+                )
+                if match is not None:
+                    return match
+        return None
+
+    return chooser
+
+
+def _opponent_plays(duel: GoatDuel, command: str, card: str) -> None:
+    """Hand the turn to the opponent, have them commit a card, and hand it back."""
+
+    duel.do("to_end_phase")
+    duel.advance_to_idle(player=1)
+    duel.do(command, card)
+    duel.resolve()
+    duel.do("to_end_phase")
+    duel.advance_to_idle(player=0)
+
+
+def test_thousand_eyes_restrict_equips_the_opponents_monster() -> None:
+    """The signature GOAT steal: TER takes the monster and copies its stats."""
+
+    with GoatDuel(
+        deck1=stack("Metamorphosis", "Scapegoat"),
+        extra1=toolbox(),
+        deck2=stack("Luster Dragon"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Scapegoat")
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        opponent_field = [
+            c["name"]
+            for c in duel.observation(0)["opponent"]["monster_zone"]
+            if c and c.get("name")
+        ]
+        assert opponent_field == ["Luster Dragon"]
+
+        duel.do("activate", "Metamorphosis")
+        duel.resolve(chooser=prefer("Thousand-Eyes Restrict", "Luster Dragon", "Sheep Token"))
+
+        mine = {
+            card["name"]: card
+            for card in duel.observation(0)["you"]["monster_zone"]
+            if card and card.get("name")
+        }
+        assert "Thousand-Eyes Restrict (GOAT)" in mine
+        # The equipped monster leaves the opponent's field...
+        assert not [
+            c for c in duel.observation(0)["opponent"]["monster_zone"] if c and c.get("name")
+        ]
+        # ...and TER takes on its ATK/DEF.
+        equipped = mine["Thousand-Eyes Restrict (GOAT)"]
+        assert (equipped["attack"], equipped["defense"]) == (1900, 1600)
+
+
+def test_book_of_moon_flips_a_face_up_monster_face_down() -> None:
+    with GoatDuel(deck1=stack("Book of Moon"), deck2=stack("Luster Dragon"), seed=3) as duel:
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        duel.do("activate", "Book of Moon")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+
+        flipped = [
+            c
+            for c in duel.observation(0)["opponent"]["monster_zone"]
+            if c and c.get("face_down")
+        ]
+        assert len(flipped) == 1
+        assert flipped[0]["position"] == "face_down_defense"
+        # Face-down means face-down: its identity is not disclosed.
+        assert flipped[0].get("name") is None
+        assert "code" not in flipped[0]
+
+
+def test_creature_swap_exchanges_control_of_a_goat_token() -> None:
+    with GoatDuel(
+        deck1=stack("Creature Swap", "Scapegoat"), deck2=stack("Luster Dragon"), seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Scapegoat")
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        duel.do("activate", "Creature Swap")
+        duel.resolve(chooser=prefer("Sheep Token", "Luster Dragon"))
+
+        mine = [
+            c["name"] for c in duel.observation(0)["you"]["monster_zone"] if c and c.get("name")
+        ]
+        theirs = [
+            c["name"]
+            for c in duel.observation(0)["opponent"]["monster_zone"]
+            if c and c.get("name")
+        ]
+        assert "Luster Dragon" in mine
+        assert theirs == ["Sheep Token"]
+        assert mine.count("Sheep Token") == 3
+
+
+def test_nobleman_of_crossout_banishes_a_flip_monster_and_its_deck_copies() -> None:
+    """The Flip clause: the target and every same-named copy are banished, not sent to the GY."""
+
+    magician = card_id("Magician of Faith")
+    filler = card_id("Luster Dragon")
+    # One copy reaches the hand to be Set; two stay in the Deck.
+    opponent_deck = [magician] * 2 + [filler] * 37 + [magician]
+
+    with GoatDuel(
+        deck1=stack("Nobleman of Crossout"), deck2=opponent_deck, seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "set_monster", "Magician of Faith")
+
+        before = duel.observation(0)["opponent"]["deck_count"]
+
+        duel.do("activate", "Nobleman of Crossout")
+        duel.resolve()
+
+        after = duel.observation(0)["opponent"]
+        assert not [c for c in after["monster_zone"] if c and c.get("name")]
+        # Banished, never sent to the graveyard -- Magician of Faith must not
+        # get the chance to be revived or flipped later.
+        assert after["graveyard"] == []
+        assert [c["name"] for c in after["banished"]] == ["Magician of Faith"] * 3
+        assert before - after["deck_count"] == 2
+
+
+def test_tsukuyomi_flips_a_monster_down_then_returns_to_the_hand() -> None:
+    """FLIP effect plus the Spirit return: Tsukuyomi never stays on the field."""
+
+    with GoatDuel(deck1=stack("Tsukuyomi"), deck2=stack("Luster Dragon"), seed=3) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("set_monster", "Tsukuyomi")
+        duel.resolve()
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        # A Flip Summon is offered as a reposition of the Set monster.
+        duel.do("repos", "Tsukuyomi")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+
+        flipped = [
+            c for c in duel.observation(0)["opponent"]["monster_zone"] if c and c.get("position")
+        ]
+        assert [c["position"] for c in flipped] == ["face_down_defense"]
+        assert _monsters(duel) == ["Tsukuyomi"]
+
+        # Spirit monsters go back to the hand at the End Phase.
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        assert _monsters(duel) == []
+        assert "Tsukuyomi" in duel.hand(0)
+
+
+def test_sinister_serpent_returns_from_the_graveyard_in_the_standby_phase() -> None:
+    with GoatDuel(
+        deck1=stack("Sinister Serpent", "Graceful Charity"), deck2=stack("Sangan"), seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Graceful Charity")
+        duel.resolve(chooser=prefer("Sinister Serpent"))
+
+        graveyard = [c["name"] for c in duel.observation(0)["you"]["graveyard"]]
+        assert "Sinister Serpent (Pre-Errata)" in graveyard
+
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        duel.do("to_end_phase")
+
+        offered_in: str | None = None
+        for _ in range(14):
+            if duel.responder() == "select_idlecmd" and duel.player == 0:
+                break
+            if duel.responder() == "select_effectyn":
+                offered_in = duel.observation().get("phase")
+                duel.choose("accept")
+                continue
+            duel.auto()
+
+        # The recovery is a Standby Phase effect, not an any-time one.
+        assert offered_in == "standby"
+        assert "Sinister Serpent (Pre-Errata)" in duel.hand(0)
+        assert "Sinister Serpent (Pre-Errata)" not in [
+            c["name"] for c in duel.observation(0)["you"]["graveyard"]
+        ]

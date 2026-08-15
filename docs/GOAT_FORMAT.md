@@ -62,20 +62,25 @@ Similar cards are never substituted.
 `GOAT.lflist.conf` is a `$whitelist`: 1705 entries, and anything absent is
 illegal rather than unlimited.
 
-## Open discrepancies
+## Resolved rulings
 
-These are reported rather than silently corrected. The locked lists are
-preserved verbatim.
+1. **Fusion toolbox size.** `GOAT_FUSION_TOOLBOX_V1` is officially **22 cards**.
+   The earlier "21" was a counting error; the itemised list is authoritative and
+   nothing is cut. It remains a literal GOAT-era Fusion Deck, not a modern
+   15-card Extra Deck, and a test pins the size at 22.
+2. **Copy-limit corrections (v1.1).** The April 2005 list applies across
+   Main + Side + Fusion combined, which put three decks over the limit. Main
+   Decks were preserved wherever practical:
+   * `PANDA_BURN_V1` — Side: -1 Ceasefire, -1 Magic Cylinder,
+     +1 Dust Tornado, +1 Solemn Judgment.
+   * `REASONING_GATE_TURBO_V1` — Side: -1 Jinzo, +1 Mobius the Frost Monarch.
+   * `EARTH_BEAT_V1` — Main: Injection Fairy Lily 2->1, Enraged Battle Ox 2->3.
+     Side: -1 Exiled Force, -1 Dust Tornado, +1 King Tiger Wanghu,
+     +1 Kinetic Soldier.
 
-1. **Fusion toolbox size.** `GOAT_FUSION_TOOLBOX_V1` is declared as 21 cards but
-   the itemised list sums to **22**. The itemised list is preserved; truncating
-   would mean choosing a card to drop.
-2. **Copy-limit violations.** The April 2005 list applies across Main + Side +
-   Fusion combined, which puts three decks over the limit:
-   * `PANDA_BURN_V1` — Ceasefire ×2 (limit 1), Magic Cylinder ×2 (limit 1)
-   * `REASONING_GATE_TURBO_V1` — Jinzo ×2 (limit 1)
-   * `EARTH_BEAT_V1` — Dust Tornado ×4 (limit 3), Exiled Force ×2 (limit 1),
-     Injection Fairy Lily ×2 (limit 1)
+   All ten decks now validate against the authoritative LFList. Deck `version`
+   stays `1` (the ids are `*_V1`); `deck_hash` is the change-detection
+   mechanism and changed for all three corrected decks.
 3. **`Kinetic Soldier` is a TCG name.** Project Ignis stores passcode 79853073 as
    `Cipher Soldier`. Resolved through an explicit, audited entry in
    `NAME_ALIASES`; every application is reported by the deck builder. This is a
@@ -89,6 +94,12 @@ YGO-Bench previously added cards in `.ydk` order, so every duel with the same
 decklists dealt identical opening hands regardless of seed. `_shuffled_main`
 now shuffles per player from the duel seed, keeping runs reproducible while
 making the seed meaningful.
+
+> **This changes reproduction of historical YGO-Bench runs.** Any replay or
+> metric produced before this fix was generated from an unshuffled deck and will
+> not reproduce. Pass `shuffle_decks=False` to `run_duel` to reproduce that
+> legacy behaviour deliberately; it is not the default and should not be used
+> for new benchmark runs.
 
 ## Reproducibility
 

@@ -220,6 +220,5 @@ def test_fusion_toolbox_is_not_truncated_to_a_modern_extra_deck() -> None:
     size = len(expand(GOAT_FUSION_TOOLBOX_V1))
     # GOAT predates the 15-card limit; the list must never be silently trimmed.
     assert size > 15
-    # The handoff declares 21 while the itemised list sums to 22.  This test
-    # pins the list as supplied so the discrepancy stays visible until ruled on.
+    # GOAT_FUSION_TOOLBOX_V1 is officially 22 cards.
     assert size == 22

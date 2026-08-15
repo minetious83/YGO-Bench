@@ -17,8 +17,7 @@
   "fusion_toolbox": {
     "id": "GOAT_FUSION_TOOLBOX_V1",
     "size": 22,
-    "declared_size": 21,
-    "note": "Literal Fusion Deck; GOAT Format predates the 15-card Extra Deck limit, so this is intentionally not truncated. NOTE: the handoff declares 21 cards but the itemised list sums to 22. The itemised list is preserved verbatim pending a ruling."
+    "note": "Literal 22-card Fusion Deck. GOAT Format predates the 15-card Extra Deck limit, so this is intentionally not truncated."
   },
   "benchmark_core": [
     "CHAOS_CONTROL_V1",
@@ -568,14 +567,14 @@
         504700143,
         60082869,
         60082869,
+        60082869,
+        41420027,
         41420027,
         41420027,
         56120475,
         56120475,
         38992735,
         79323590,
-        62279055,
-        36468556,
         51452091
       ],
       "fusion": [],
@@ -587,13 +586,10 @@
       },
       "source": "goat_ai_trainer_reference",
       "locked": true,
-      "legal": false,
-      "validation_errors": [
-        "Ceasefire (36468556) x2 exceeds 1 copy",
-        "Magic Cylinder (62279055) x2 exceeds 1 copy"
-      ],
+      "legal": true,
+      "validation_errors": [],
       "aliases_applied": [],
-      "deck_hash": "b3a6cf3233d99c182023a26dce14d7d223e6e2ce0ac66262ebe22ea286d7918d"
+      "deck_hash": "983261a96b7980aac7c201d397bd8e9968aa88a4dab84b2c68d2d3f36cb2d05e"
     },
     {
       "id": "REASONING_GATE_TURBO_V1",
@@ -650,6 +646,7 @@
       "side": [
         4929256,
         4929256,
+        4929256,
         504700077,
         504700077,
         51452091,
@@ -660,7 +657,6 @@
         14087893,
         56120475,
         56120475,
-        77585513,
         72302403,
         36468556
       ],
@@ -696,12 +692,10 @@
       },
       "source": "goat_ai_trainer_reference",
       "locked": true,
-      "legal": false,
-      "validation_errors": [
-        "Jinzo (77585513) x2 exceeds 1 copy"
-      ],
+      "legal": true,
+      "validation_errors": [],
       "aliases_applied": [],
-      "deck_hash": "daf58df28d15e36d7616084fcdfdff272208ddd783673f8e267d95f2b7736d6c"
+      "deck_hash": "c713a8a4636f34eeaaec53b62b03c0558ddabc089717c9f15f83c031af3f0bc8"
     },
     {
       "id": "CHAOS_RETURN_V1",
@@ -918,7 +912,7 @@
         47606319,
         76909279,
         76909279,
-        504700138,
+        76909279,
         504700138,
         74131780,
         70074904,
@@ -951,13 +945,13 @@
       "side": [
         504700143,
         504700143,
+        504700143,
+        504700139,
         504700139,
         504700139,
         88240808,
         88240808,
         70074904,
-        74131780,
-        60082869,
         60082869,
         51452091,
         51452091,
@@ -974,16 +968,12 @@
       },
       "source": "goat_ai_trainer_reference",
       "locked": true,
-      "legal": false,
-      "validation_errors": [
-        "Dust Tornado (60082869) x4 exceeds 3 copies",
-        "Exiled Force (74131780) x2 exceeds 1 copy",
-        "Injection Fairy Lily (GOAT) (504700138) x2 exceeds 1 copy"
-      ],
+      "legal": true,
+      "validation_errors": [],
       "aliases_applied": [
         "'Kinetic Soldier' -> 'Cipher Soldier (GOAT)' (504700139) via NAME_ALIASES"
       ],
-      "deck_hash": "6cbdfabe5b8f046dfcd896e3762c01fb0c302b285760ace19e3e3c5254375453"
+      "deck_hash": "c5a751c422dec36e2bedd0b96556bf9231d41027b9bd76c6266dadbf1e353f71"
     }
   ]
 }

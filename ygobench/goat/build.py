@@ -215,12 +215,9 @@ def write_library(
         "fusion_toolbox": {
             "id": FUSION_TOOLBOX_ID,
             "size": sum(count for count, _ in GOAT_FUSION_TOOLBOX_V1),
-            "declared_size": 21,
             "note": (
-                "Literal Fusion Deck; GOAT Format predates the 15-card Extra Deck "
-                "limit, so this is intentionally not truncated. NOTE: the handoff "
-                "declares 21 cards but the itemised list sums to 22. The itemised "
-                "list is preserved verbatim pending a ruling."
+                "Literal 22-card Fusion Deck. GOAT Format predates the 15-card "
+                "Extra Deck limit, so this is intentionally not truncated."
             ),
         },
         "benchmark_core": list(BENCHMARK_CORE),

@@ -21,21 +21,17 @@ pytestmark = pytest.mark.skipif(
     reason="card database not built; run `ygo-bench setup`",
 )
 
-#: Decks whose locked lists currently break April 2005 legality.  These are
-#: reported upstream for a ruling, not silently corrected.  The exact expected
-#: text keeps the discrepancy visible and catches any drift in either direction.
-KNOWN_ILLEGAL: dict[str, set[str]] = {
-    "PANDA_BURN_V1": {
-        "Ceasefire (36468556) x2 exceeds 1 copy",
-        "Magic Cylinder (62279055) x2 exceeds 1 copy",
-    },
-    "REASONING_GATE_TURBO_V1": {
-        "Jinzo (77585513) x2 exceeds 1 copy",
-    },
+#: Copy counts that the v1.1 corrections were specifically made to fix.  Pinning
+#: them stops a future edit from quietly reintroducing a Forbidden & Limited
+#: violation that the whole-deck check would still catch but not explain.
+CORRECTED_COUNTS: dict[str, dict[str, int]] = {
+    "PANDA_BURN_V1": {"Ceasefire": 1, "Magic Cylinder": 1, "Dust Tornado": 3},
+    "REASONING_GATE_TURBO_V1": {"Jinzo": 1, "Mobius the Frost Monarch": 3},
     "EARTH_BEAT_V1": {
-        "Dust Tornado (60082869) x4 exceeds 3 copies",
-        "Exiled Force (74131780) x2 exceeds 1 copy",
-        "Injection Fairy Lily (GOAT) (504700138) x2 exceeds 1 copy",
+        "Injection Fairy Lily": 1,
+        "Exiled Force": 1,
+        "Dust Tornado": 3,
+        "Enraged Battle Ox": 3,
     },
 }
 
@@ -76,13 +72,25 @@ def test_decks_have_the_expected_section_counts(decks) -> None:
         assert len(built.fusion) == expected_fusion, built.deck.id
 
 
-def test_only_the_known_discrepancies_are_illegal(decks) -> None:
-    actual = {
-        built.deck.id: set(built.validation.errors)
-        for built in decks
-        if built.validation is not None and built.validation.errors
+def test_all_ten_decks_are_legal_for_april_2005(decks) -> None:
+    illegal = {
+        built.deck.id: built.errors for built in decks if not built.ok
     }
-    assert actual == KNOWN_ILLEGAL
+    assert illegal == {}
+
+
+@pytest.mark.parametrize("deck_id", sorted(CORRECTED_COUNTS))
+def test_v1_1_copy_corrections_hold(decks, index, limit_list, deck_id: str) -> None:
+    """Copy counts across Main + Side that the v1.1 corrections established."""
+
+    built = next(b for b in decks if b.deck.id == deck_id)
+    counts: dict[int, int] = {}
+    for code in [*built.main, *built.side, *built.fusion]:
+        key = index.limit_key(code)
+        counts[key] = counts.get(key, 0) + 1
+    for name, expected in CORRECTED_COUNTS[deck_id].items():
+        code = index.resolve(name, pool=limit_list.pool)
+        assert counts.get(index.limit_key(code), 0) == expected, f"{deck_id}: {name}"
 
 
 def test_name_alias_resolves_to_the_same_physical_card(index, limit_list) -> None:

@@ -29,7 +29,7 @@ NAME_ALIASES: dict[str, str] = {
     "Kinetic Soldier": "Cipher Soldier",
 }
 
-#: A literal 21-card Fusion Deck.  GOAT Format predates the 15-card Extra Deck
+#: A literal 22-card Fusion Deck.  GOAT Format predates the 15-card Extra Deck
 #: limit, so this is intentionally larger than a modern Extra Deck.
 GOAT_FUSION_TOOLBOX_V1: tuple[Entry, ...] = (
     (3, "Thousand-Eyes Restrict"),
@@ -368,15 +368,15 @@ PANDA_BURN_V1 = ReferenceDeck(
         (1, "Ceasefire"),
     ),
     side=(
+        # v1.1: -1 Ceasefire, -1 Magic Cylinder (both Limited and already in the
+        # Main Deck), +1 Dust Tornado, +1 Solemn Judgment.
         (2, "Lava Golem"),
         (2, "King Tiger Wanghu"),
-        (2, "Dust Tornado"),
-        (2, "Solemn Judgment"),
+        (3, "Dust Tornado"),
+        (3, "Solemn Judgment"),
         (2, "Sakuretsu Armor"),
         (1, "Wave-Motion Cannon"),
         (1, "Chain Energy"),
-        (1, "Magic Cylinder"),
-        (1, "Ceasefire"),
         (1, "Royal Decree"),
     ),
     fusion_reference=None,
@@ -421,13 +421,13 @@ REASONING_GATE_TURBO_V1 = ReferenceDeck(
         (1, "Torrential Tribute"),
     ),
     side=(
-        (2, "Mobius the Frost Monarch"),
+        # v1.1: -1 Jinzo (Limited and already in the Main Deck), +1 Mobius.
+        (3, "Mobius the Frost Monarch"),
         (2, "Mystic Swordsman LV2"),
         (2, "Royal Decree"),
         (2, "Dust Tornado"),
         (2, "Book of Moon"),
         (2, "Sakuretsu Armor"),
-        (1, "Jinzo"),
         (1, "Swords of Revealing Light"),
         (1, "Ceasefire"),
     ),
@@ -540,8 +540,10 @@ EARTH_BEAT_V1 = ReferenceDeck(
         (3, "Giant Rat"),
         (3, "Berserk Gorilla"),
         (3, "Gigantes"),
-        (2, "Enraged Battle Ox"),
-        (2, "Injection Fairy Lily"),
+        # v1.1: Injection Fairy Lily is Limited, so 2 -> 1; the freed slot goes
+        # to a third Enraged Battle Ox to keep the Earth beatdown curve intact.
+        (3, "Enraged Battle Ox"),
+        (1, "Injection Fairy Lily"),
         (1, "Exiled Force"),
         (1, "D.D. Assailant"),
         (1, "Tribe-Infecting Virus"),
@@ -565,12 +567,14 @@ EARTH_BEAT_V1 = ReferenceDeck(
         (2, "Dust Tornado"),
     ),
     side=(
-        (2, "King Tiger Wanghu"),
-        (2, "Kinetic Soldier"),
+        # v1.1: -1 Exiled Force (Limited, already in the Main Deck), -1 Dust
+        # Tornado (Main Deck already runs 2 of 3), +1 King Tiger Wanghu,
+        # +1 Kinetic Soldier.
+        (3, "King Tiger Wanghu"),
+        (3, "Kinetic Soldier"),
         (2, "Kycoo the Ghost Destroyer"),
         (1, "D.D. Assailant"),
-        (1, "Exiled Force"),
-        (2, "Dust Tornado"),
+        (1, "Dust Tornado"),
         (2, "Royal Decree"),
         (1, "Jinzo"),
         (1, "Swords of Revealing Light"),

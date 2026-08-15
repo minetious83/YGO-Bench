@@ -21,6 +21,8 @@ class ArenaConfig:
     seeds: tuple[int, ...]
     max_decisions: int = 2000
     run_name: str | None = None
+    duel_format: str | None = None
+    deck_root: Path | None = None
 
 
 def run_arena(config: ArenaConfig) -> Path:
@@ -28,7 +30,7 @@ def run_arena(config: ArenaConfig) -> Path:
     run_name = config.run_name or f"{stamp}_full_duel_arena"
     run_dir = PROJECT_ROOT / "bench_data" / "runs" / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-    deck_root = PROJECT_ROOT / "resources" / "decks"
+    deck_root = config.deck_root or PROJECT_ROOT / "resources" / "decks"
     missing = [deck for deck in config.decks if not (deck_root / f"{deck}.ydk").is_file()]
     if missing:
         raise ValueError(f"Missing deck files: {', '.join(missing)}")
@@ -54,6 +56,7 @@ def run_arena(config: ArenaConfig) -> Path:
                         max_decisions=config.max_decisions,
                         output_dir=run_dir,
                         replay_name=replay_name,
+                        duel_format=config.duel_format,
                     )
                     game = result.to_dict()
                     game.update(

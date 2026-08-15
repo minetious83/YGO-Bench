@@ -107,3 +107,47 @@ A run is reproducible given the engine build, CardScripts commit, card database,
 format profile, deck hashes and seed. The deck manifest records the card
 databases, lflist, and the `yugi-bench`/CardScripts commits; each duel replay
 records the format profile and the resolved duel flags.
+
+## GOAT ruling suite (Milestone 0.2)
+
+`tests/goat_harness.py` drives a real `DUEL_MODE_GOAT` duel with a stacked deck
+so a scenario can put known cards in hand and then play legal actions through
+the same call path the duel runner uses. It chooses deck contents and order and
+nothing else -- no engine interaction is bypassed.
+
+Findings from batch 1, all observed from the engine:
+
+* **Legacy ignition priority is implemented.** After Normal Summoning Breaker
+  the Magical Warrior, GOAT offers its ignition effect to the summoning player
+  in a chain window immediately after the summon. The identical scenario under
+  Master Rule 5 offers nothing in that window. This is the differential the
+  test asserts, so it cannot be explained by the scenario alone.
+* **Scapegoat is the pre-errata card.** It makes four Level 1 Sheep Tokens and
+  registers `CANNOT_SUMMON` / `CANNOT_FLIP_SUMMON` / `CANNOT_SPECIAL_SUMMON`
+  for the turn. Setting a monster is still allowed (Setting is not Summoning,
+  and the 2005 text does not forbid it). Because Special Summoning is locked,
+  Metamorphosis on a Sheep Token is necessarily a two-turn play -- exactly how
+  the line was played in 2005.
+* **Metamorphosis matches Levels strictly.** From a Sheep Token (Level 1) the
+  engine offers only Thousand-Eyes Restrict; from Chaos Sorcerer (Level 6) it
+  offers exactly the Level 6 Fusions in the 22-card toolbox (Ryu Senshi, Dark
+  Blade the Dragon Knight, Ojama King, Dark Flare Knight, Roaring Ocean Snake)
+  and not Thousand-Eyes Restrict.
+* **Chaos Sorcerer** Special Summons by banishing one LIGHT and one DARK from
+  the graveyard, verified by inspecting the banished zone afterwards.
+
+Note for scenario authors: `Thunder Dragon` is **LIGHT**, not DARK -- which is
+why GOAT Chaos decks run it as LIGHT fodder.
+
+### Action-space defect found while building the suite
+
+`legal_actions_from_pending` puts the upstream passive response first and then
+de-duplicates by `(tool, arguments)`, keeping the first entry. For
+`select_unselect_card` prompts (Chaos Sorcerer's banish cost, for example) the
+passive response is either `index: None` -- which *cancels* the effect -- or
+`index: 0`, which collides with the concrete "select card 0" choice and removes
+it from the list. An agent therefore cannot reach the first selectable card by
+label, and picking the first listed action silently aborts the summon. The
+harness works around it by constructing the response directly; the action space
+itself has not been changed. This affects LLM agents on any card with a
+select/unselect cost and should be fixed before the AI-vs-AI benchmark layer.

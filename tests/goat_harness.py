@@ -19,6 +19,7 @@ from typing import Any
 from ygobench.agents.action_space import legal_actions_from_pending
 from ygobench.cards import CardIndex
 from ygobench.engine import full_duel
+from ygobench.engine.protocol import ActionChoice
 from ygobench.engine.upstream import UpstreamLayout
 from ygobench.engine.visibility import sanitize_events_for_player
 from ygobench.formats import get_format, resolve_duel_flags
@@ -51,6 +52,14 @@ def card_id(name: str) -> int:
 
 def card_name(code: int) -> str:
     return _pool()[0].name_of(code)
+
+
+def toolbox() -> list[int]:
+    """GOAT_FUSION_TOOLBOX_V1 resolved to card ids (22 cards)."""
+
+    from ygobench.goat.decklists import GOAT_FUSION_TOOLBOX_V1, expand
+
+    return [card_id(name) for name in expand(GOAT_FUSION_TOOLBOX_V1)]
 
 
 def stack(*names: str, size: int = 40) -> list[int]:
@@ -197,13 +206,130 @@ class GoatDuel:
             )
         return self.play(match)
 
+    def decision(self) -> dict[str, Any]:
+        return self.observation().get("decision", {}) or {}
+
+    def responder(self) -> str:
+        return str(self.decision().get("responder", ""))
+
+    def idle_choices(self) -> list[dict[str, Any]]:
+        """The `(command, card)` options offered at an idle/battle prompt."""
+
+        return list(self.decision().get("choices", []))
+
+    def can(self, command: str, card: str | None = None) -> bool:
+        return self._find_idle(command, card) is not None
+
+    def _find_idle(self, command: str, card: str | None):
+        for choice in self.idle_choices():
+            if choice.get("command") != command:
+                continue
+            name = (choice.get("card") or {}).get("name", "")
+            if card is None or card.casefold() in name.casefold():
+                return choice
+        return None
+
+    def do(self, command: str, card: str | None = None) -> Step:
+        """Play an idle/battle command such as ``summon`` or ``activate``."""
+
+        choice = self._find_idle(command, card)
+        if choice is None:
+            offered = [
+                (c.get("command"), (c.get("card") or {}).get("name")) for c in self.idle_choices()
+            ]
+            raise AssertionError(f"No {command!r} for {card!r}; offered: {offered}")
+        action = next(
+            a
+            for a in self.legal_actions()
+            if a.arguments.get("command") == choice.get("command")
+            and a.arguments.get("index") == choice.get("index")
+        )
+        return self.play(action)
+
+    def advance_to_idle(self, player: int | None = None, limit: int = 120) -> None:
+        """Advance until ``player`` reaches an idle-command prompt.
+
+        Other players' turns are passed by going straight to the End Phase, so
+        an intervening turn cannot perturb the scenario under test.
+        """
+
+        for _ in range(limit):
+            if self.duel.state.game_over or self.duel.pending is None:
+                raise AssertionError("duel ended before reaching an idle prompt")
+            responder = self.responder()
+            if responder in {"select_idlecmd", "select_battlecmd"}:
+                if responder == "select_idlecmd" and (player is None or self.player == player):
+                    return
+                if self.can("to_end_phase"):
+                    self.do("to_end_phase")
+                    continue
+            self.auto()
+        raise AssertionError(f"never reached an idle prompt for player {player}")
+
+    def resolve(self, limit: int = 40, chooser=None) -> None:
+        """Work through an effect's sub-prompts until the next idle command.
+
+        ``chooser(responder, duel)`` may return an ActionChoice to override the
+        default, which is "make the first concrete choice offered".  Note that
+        the action space puts a passive entry first for most prompts; picking it
+        would decline the effect, so concrete choices are preferred here.
+        """
+
+        for _ in range(limit):
+            if self.pending is None or self.duel.state.game_over:
+                return
+            responder = self.responder()
+            if responder == "select_idlecmd":
+                return
+            if chooser is not None:
+                override = chooser(responder, self)
+                if override is not None:
+                    self.play(override)
+                    continue
+            if responder == "select_unselect_card":
+                # Built directly rather than picked from legal_actions(): the
+                # action space's passive entry is emitted first and the trailing
+                # de-duplication then swallows the concrete "index 0" choice, so
+                # index 0 is unreachable by label. See GOAT_FORMAT.md.
+                decision = self.decision()
+                if decision.get("selectable_cards"):
+                    self.play(ActionChoice(responder, {"index": 0}, "select 0"))
+                else:
+                    self.play(ActionChoice(responder, {"index": None}, "finish"))
+                continue
+            actions = self.legal_actions()
+            if responder in {
+                "select_card",
+                "select_tribute",
+                "select_place",
+                "select_position",
+                "select_option",
+                "select_sum",
+            } and len(actions) > 1:
+                self.play(actions[1])
+                continue
+            self.auto()
+        raise AssertionError(f"prompts did not settle within {limit} steps")
+
+    def end_turn(self, limit: int = 120) -> None:
+        """End the current player's turn and stop at their opponent's idle prompt."""
+
+        current = self.player
+        self.do("to_end_phase")
+        self.advance_to_idle(player=1 - current, limit=limit)
+
     def auto(self, steps: int = 1) -> None:
-        """Advance with the engine's own passive response (declines options)."""
+        """Advance with the passive response (declines optional activations).
+
+        Uses the action space's own passive entry rather than the raw engine
+        fallback, because the latter does not produce a valid payload for every
+        prompt (``select_place`` in particular).
+        """
 
         for _ in range(steps):
             if self.duel.state.game_over or self.duel.pending is None:
                 return
-            self.play(full_duel._passive_fallback(self.duel.pending, self._replay_mod))
+            self.play(self.legal_actions()[0])
 
     def close(self) -> None:
         if not self._closed:

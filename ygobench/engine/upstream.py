@@ -28,6 +28,10 @@ class UpstreamLayout:
         return enriched if enriched.exists() else lean
 
     @property
+    def card_database_dir(self) -> Path:
+        return self.root / "vendor" / "distribution" / "expansions"
+
+    @property
     def engine_library(self) -> Path:
         suffix = "libocgcore.dylib" if platform.system() == "Darwin" else "libocgcore.so"
         return self.root / "vendor" / "ygopro-core" / "bin" / "release" / suffix

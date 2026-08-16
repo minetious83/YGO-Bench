@@ -733,3 +733,130 @@ def test_chain_resolves_last_in_first_out_and_a_stale_target_does_nothing() -> N
         assert [c["name"] for c in observation["opponent"]["graveyard"]] == ["Luster Dragon"]
         # ...so link 1 (Book of Moon) resolved with nothing to flip.
         assert not [c for c in observation["opponent"]["monster_zone"] if c and c.get("position")]
+
+
+# --------------------------------------------------------------------------
+# Milestone 0.25: the two deferred follow-ups
+# --------------------------------------------------------------------------
+
+
+def _call_of_the_haunted_then(flip_face_down: bool, removal: str) -> dict:
+    """Revive with Call, optionally flip the monster down, then apply ``removal``."""
+
+    with GoatDuel(
+        deck1=stack("Luster Dragon", removal, "Book of Moon", "Call of the Haunted",
+                    "Graceful Charity"),
+        deck2=stack("Sangan"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Graceful Charity")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+        duel.do("set_spell", "Call of the Haunted")
+        duel.resolve()
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=0)
+
+        duel.do("activate", "Call of the Haunted")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+        assert _monsters(duel) == ["Luster Dragon"]
+
+        if flip_face_down:
+            duel.do("activate", "Book of Moon")
+            duel.resolve(chooser=prefer("Luster Dragon"))
+
+        duel.do("activate", removal)
+        duel.resolve(chooser=prefer("Call of the Haunted", "Luster Dragon"))
+        return duel.observation(0)
+
+
+def test_book_of_moon_severs_the_call_of_the_haunted_link() -> None:
+    """Flipping the revived monster face-down breaks the link both ways.
+
+    Engine-observed, not asserted from card text: while the monster is face-up,
+    destroying Call destroys it; once Book of Moon has turned it face-down the
+    two stop being tied together.
+    """
+
+    face_up = _call_of_the_haunted_then(False, "Mystical Space Typhoon")
+    assert not [c for c in face_up["you"]["monster_zone"] if c and c.get("position")]
+
+    face_down = _call_of_the_haunted_then(True, "Mystical Space Typhoon")
+    survivor = [c for c in face_down["you"]["monster_zone"] if c and c.get("position")]
+    assert [c["position"] for c in survivor] == ["face_down_defense"]
+
+
+def test_call_of_the_haunted_survives_the_face_down_monster_leaving() -> None:
+    """The other direction of the severed link: the monster goes, Call stays."""
+
+    observation = _call_of_the_haunted_then(True, "Nobleman of Crossout")
+    assert not [c for c in observation["you"]["monster_zone"] if c and c.get("position")]
+    assert [c["name"] for c in observation["you"]["banished"]] == ["Luster Dragon"]
+    still_there = [c["name"] for c in observation["you"]["spell_trap_zone"] if c and c.get("name")]
+    assert "Call of the Haunted" in still_there
+
+
+def test_jinzo_arriving_mid_chain_negates_a_trap_already_on_the_chain() -> None:
+    """Built from ordinary GOAT cards: Call of the Haunted is a Trap, so it chains.
+
+    Chain link 1 is Mystical Space Typhoon, link 2 the opponent's Jar of Greed,
+    link 3 Call of the Haunted reviving Jinzo.  Link 3 resolves first, putting
+    Jinzo on the field before link 2 resolves -- and Jar of Greed then draws
+    nothing.
+    """
+
+    with GoatDuel(
+        deck1=stack("Jinzo", "Mystical Space Typhoon", "Call of the Haunted", "Graceful Charity"),
+        deck2=stack("Jar of Greed"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Graceful Charity")
+        duel.resolve(chooser=prefer("Jinzo"))
+        duel.do("set_spell", "Call of the Haunted")
+        duel.resolve()
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        duel.do("set_spell", "Jar of Greed")
+        duel.resolve()
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=0)
+
+        deck_before = duel.observation(1)["you"]["deck_count"]
+        duel.do("activate", "Mystical Space Typhoon")  # chain link 1
+
+        chains: list[list[str]] = []
+        for _ in range(24):
+            responder = duel.responder()
+            if responder == "select_idlecmd":
+                break
+            chain = [c.get("name", "") for c in (duel.observation().get("chain") or [])]
+            if chain:
+                chains.append(chain)
+            labels = duel.legal_labels()
+            if responder == "select_chain" and duel.player == 1 and any(
+                "Jar of Greed" in (x or "") for x in labels
+            ):
+                duel.choose("Jar of Greed")  # chain link 2
+                continue
+            if responder == "select_chain" and duel.player == 0 and any(
+                "Call of the Haunted" in (x or "") for x in labels
+            ):
+                duel.choose("Call of the Haunted")  # chain link 3
+                continue
+            if responder == "select_card":
+                match = next(
+                    (a for a in duel.legal_actions() if "Jinzo" in (a.label or "")), None
+                )
+                if match is not None:
+                    duel.play(match)
+                    continue
+            duel.auto()
+
+        assert max(len(c) for c in chains) == 3
+        assert _monsters(duel) == ["Jinzo"]
+        # Jar of Greed was already on the chain, but resolves under Jinzo and
+        # draws nothing.
+        assert duel.observation(1)["you"]["deck_count"] == deck_before

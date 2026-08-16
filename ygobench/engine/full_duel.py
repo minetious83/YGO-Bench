@@ -17,6 +17,7 @@ from typing import Any
 from ygobench.agents.action_space import legal_actions_from_pending
 from ygobench.agents.base import BaseAgent
 from ygobench.agents.passive_agent import PassiveAgent
+from ygobench.agents.semantics import translate
 from ygobench.cards import CardIndex
 from ygobench.config import PROJECT_ROOT
 from ygobench.engine.protocol import ActionChoice, DecisionRequest
@@ -347,7 +348,15 @@ def run_duel(
                 legal_actions=legal_actions,
                 decision_type=str(observation.get("decision", {}).get("responder", "")),
             )
-            log({"type": "observation", "player": player, "state": observation})
+            semantic = translate(observation.get("decision", {}) or {}, legal_actions)
+            log(
+                {
+                    "type": "observation",
+                    "player": player,
+                    "state": observation,
+                    "semantic_actions": semantic.to_dict(),
+                }
+            )
             agent = agents[player]
             call_started = time.perf_counter()
             agent_error: str | None = None

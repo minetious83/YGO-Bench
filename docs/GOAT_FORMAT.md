@@ -237,3 +237,63 @@ These are recorded for the eventual Duel AI design; no policy is built here.
   a reposition of a Set monster rather than as its own command. That is an
   action-semantics issue to resolve in the agent abstraction, since a model
   reasoning about "Flip Summon" will not find a command by that name.
+
+## Milestone 0.25 — action semantics
+
+`ygobench/agents/semantics.py` renames the engine's vocabulary into the words a
+player would use, so a model can reason about "Flip Summon Tsukuyomi" instead of
+`repos(index=0)`. It is a **translation only**: each semantic action wraps
+exactly one `ActionChoice` from `legal_actions_from_pending`, keeps it verbatim
+in `raw`, preserves ordering, invents nothing, and adds no information the
+acting player did not already have. The engine remains the only legality
+oracle. Replays record the semantic view alongside the raw payload.
+
+| Engine | Semantic |
+| --- | --- |
+| `repos` on a face-down monster | `flip_summon(card=...)` |
+| `repos` on a face-up monster | `change_position(card=...)` |
+| bare `attack` | `declare_attack(card=...)` |
+| `select_unselect_card(index=N)` | `select_card` / `unselect_card` by name |
+| `select_unselect_card(index=None)` | `finish_selection` **or** `cancel_selection` |
+| `select_effectyn(accept=False)` | `decline` (a true decline) |
+
+`has_true_decline()` reports whether declining is genuinely on offer, because
+not every prompt has one -- a select/unselect prompt midway through paying a
+cost does not.
+
+### Defect this immediately caught: cancel is not finish
+
+For `select_unselect_card`, `index: None` means *finish* once something is
+selected and *cancel* when nothing is. Naming both "finish" let the
+deterministic `first_legal` agent choose a Special Summon, cancel the banish
+cost it had just committed to, return to the idle prompt and choose it again --
+forever. Twenty-seven of the first 144 benchmark duels hit that loop. Splitting
+the two names and marking the empty-selection case a decline removed every
+stall.
+
+## Milestone 0.3 — benchmark harness
+
+`ygobench/bench/goat_benchmark.py` runs a matrix of GOAT duels between
+deterministic agents and records, per duel: duel id, format, seed, deck ids and
+hashes, seat assignment, agent ids and versions, winner and winning seat, turn
+and decision counts, illegal-action counts, engine exceptions, a stall
+indicator, replay path, replay hash, action-stream hash and elapsed time. Each
+run also stores a dependency fingerprint (engine, CardScripts and repo commits,
+card databases, platform).
+
+```bash
+ygo-bench goat-bench --decks CHAOS_CONTROL_V1 WARRIOR_V1 --agents passive random first_legal
+```
+
+Two hashes, deliberately: `replay_hash` covers the file for provenance and is
+**not** a determinism signal, because a replay embeds wall-clock timings that
+vary between runs. `action_stream_hash` covers the decision sequence alone, so
+identical inputs reproduce it exactly.
+
+`audit_replay()` re-reads a replay and checks that no opponent card identity
+ever reached the acting player, that every submitted action was in the
+engine-provided legal set for that decision, and that nothing was silently
+replaced by a fallback.
+
+Win rates between passive, random and first-legal agents are infrastructure
+diagnostics. They say nothing about deck strength and must not be read that way.

@@ -119,6 +119,28 @@ def _announce_card_actions(card_db: Any, opcodes: list[int], limit: int = 64):
                 return
 
 
+def _mask_label(responder: str, bit: int) -> str:
+    """Human-readable name for a single race/attribute bit."""
+
+    names = _RACE_NAMES if responder == "announce_race" else _ATTRIBUTE_NAMES
+    return names.get(bit, f"0x{bit:x}")
+
+
+_RACE_NAMES = {
+    0x1: "Warrior", 0x2: "Spellcaster", 0x4: "Fairy", 0x8: "Fiend",
+    0x10: "Zombie", 0x20: "Machine", 0x40: "Aqua", 0x80: "Pyro",
+    0x100: "Rock", 0x200: "Winged Beast", 0x400: "Plant", 0x800: "Insect",
+    0x1000: "Thunder", 0x2000: "Dragon", 0x4000: "Beast", 0x8000: "Beast-Warrior",
+    0x10000: "Dinosaur", 0x20000: "Fish", 0x40000: "Sea Serpent", 0x80000: "Reptile",
+    0x100000: "Psychic", 0x200000: "Divine-Beast",
+}
+
+_ATTRIBUTE_NAMES = {
+    0x1: "EARTH", 0x2: "WATER", 0x4: "FIRE", 0x8: "WIND",
+    0x10: "LIGHT", 0x20: "DARK", 0x40: "DIVINE",
+}
+
+
 def _choice(tool: str, arguments: dict[str, Any], label: str = "") -> ActionChoice:
     return ActionChoice(tool=tool, arguments=arguments, label=label or f"{tool} {arguments}")
 
@@ -234,6 +256,18 @@ def legal_actions_from_pending(
             limit=128,
         ):
             actions.append(_choice(responder, {"indices": indices}, f"sum indices {indices}"))
+    elif responder in {"announce_race", "announce_attribute"}:
+        # The engine hands over a bitmask; without splitting it the only
+        # available response is the passive default, so a card such as
+        # Tribe-Infecting Virus could never actually pick its declaration.
+        mask = int(decision.get("available_mask", 0) or 0)
+        count = int(decision.get("count", 1) or 1)
+        key = "races_mask" if responder == "announce_race" else "attributes_mask"
+        bits = [1 << shift for shift in range(32) if mask & (1 << shift)]
+        if count == 1:
+            actions.extend(
+                _choice(responder, {key: bit}, _mask_label(responder, bit)) for bit in bits
+            )
     elif responder == "announce_number":
         actions.extend(
             _choice(responder, {"index": idx}, str(number))

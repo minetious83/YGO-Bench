@@ -222,6 +222,13 @@ def translate(
             name, args = "choose_zone", {"places": arguments.get("places", [])}
             description = "Choose a zone"
 
+        elif responder in {"announce_race", "announce_attribute"}:
+            key = "races_mask" if responder == "announce_race" else "attributes_mask"
+            noun = "Type" if responder == "announce_race" else "Attribute"
+            name, args = f"declare_{noun.lower()}", {noun.lower(): raw.label}
+            description = f"Declare {noun} {raw.label}"
+            _ = arguments.get(key)
+
         elif responder == "select_option":
             name, args = "choose_option", {"option": raw.label}
             description = f"Choose option: {raw.label}"

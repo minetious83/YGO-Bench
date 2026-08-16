@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ygobench.agents.base import BaseAgent
 from ygobench.agents.first_legal_agent import FirstLegalAgent
+from ygobench.agents.goat_heuristic import GoatHeuristicAgent
 from ygobench.agents.llm_agent import LLMFullDuelAgent
 from ygobench.agents.passive_agent import PassiveAgent
 from ygobench.agents.random_agent import RandomAgent
@@ -17,6 +18,8 @@ def create_agent(agent_id: str, *, seed: int = 0) -> BaseAgent:
         return RandomAgent(seed=seed)
     if agent_id == "first_legal":
         return FirstLegalAgent()
+    if agent_id in {"goat_heuristic", "goat_heuristic_v1"}:
+        return GoatHeuristicAgent()
     if agent_id.startswith("react-fast"):
         parts = agent_id.split(":", 2)
         provider = parts[1] if len(parts) > 1 and parts[1] else None
@@ -33,6 +36,6 @@ def create_agent(agent_id: str, *, seed: int = 0) -> BaseAgent:
         model = parts[2] if len(parts) > 2 and parts[2] else None
         return LLMFullDuelAgent(default_model_config(provider, model))
     raise ValueError(
-        f"Unknown full-duel agent {agent_id!r}; use passive, random, first_legal, "
+        f"Unknown full-duel agent {agent_id!r}; use passive, random, first_legal, goat_heuristic, "
         "react[:provider:model], or react-fast[:provider:model]."
     )

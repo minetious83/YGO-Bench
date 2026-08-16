@@ -297,3 +297,55 @@ replaced by a fallback.
 
 Win rates between passive, random and first-legal agents are infrastructure
 diagnostics. They say nothing about deck strength and must not be read that way.
+
+## Milestone 0.4 — `goat_heuristic_v1`
+
+A transparent, deterministic GOAT baseline. The point is to be *understandable*,
+not strong: roughly twenty named rules score every legal action, the highest
+score wins, and the reasoning is recorded. It is bound by the same contract a
+future LLM agent will be -- it sees only the acting player's observation, the
+derived strategic state and the semantic legal actions, and returns exactly one
+of those actions.
+
+| Module | Responsibility |
+| --- | --- |
+| `ygobench/goat/strategy_state.py` | derived strategic state, visible data only |
+| `ygobench/agents/goat_heuristic.py` | named scoring rules + decision trace |
+
+### Strategic state
+
+Counts, sums and classifies what the player can already see: life totals, hand
+sizes (the opponent's *counted*, never identified), monster/backrow counts,
+face-down counts, Goat Tokens, LIGHT and DARK in the graveyard, best attack on
+each side, revealed opponent cards, premium removal they have already spent, and
+an estimate of available battle damage. Derived conveniences: `chaos_ready`,
+`opponent_field_open`, `board_deficit`.
+
+It is not a second rules engine. A test asserts that changing hidden opponent
+cards, without changing anything visible, changes neither the extracted state
+nor the chosen action.
+
+### Scoring
+
+Each rule returns named contributions that sum to a score; ties break on the
+engine's own action ordering, so choices are reproducible. Rules cover immediate
+tactics (lethal, favourable and suicidal battles), card economy (draw spells,
+premium-removal scarcity), resource preservation (Heavy Storm and spot removal
+valued against actual targets), Chaos readiness, and the format-defining cards:
+Scapegoat, Metamorphosis, Thousand-Eyes Restrict, Chaos monsters, Nobleman and
+Creature Swap. Everything else is scored generically -- there is no attempt to
+script all ten decks.
+
+Every decision records `chosen_action`, `candidate_actions`, per-rule
+contributions, the strategic state and the tie-break, and keeps the exact engine
+payload. That trace is what a Coach will later compare against.
+
+### Action-space gap this milestone found
+
+Real duels reach `announce_race` (Tribe-Infecting Virus declaring a Type). The
+action space emitted only the passive default for it, so the declared Type could
+never actually be chosen -- the same class of defect as the earlier
+select/unselect collision. `announce_race` and `announce_attribute` now split
+their bitmask into one named choice per bit. `announce_card`, `announce_number`
+and `select_sum` still have not occurred in a real duel and remain pass-through,
+deliberately un-abstracted until something exercises them.

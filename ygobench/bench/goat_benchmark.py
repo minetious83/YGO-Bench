@@ -40,7 +40,12 @@ CORE_DECKS: tuple[str, ...] = (
     "CHAOS_WARRIOR_V1",
 )
 
-AGENT_VERSIONS: dict[str, str] = {"passive": "1", "random": "1", "first_legal": "1"}
+AGENT_VERSIONS: dict[str, str] = {
+    "passive": "1",
+    "random": "1",
+    "first_legal": "1",
+    "goat_heuristic": "goat_heuristic_v1",
+}
 
 
 @dataclass

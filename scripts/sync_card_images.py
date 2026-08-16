@@ -7,11 +7,20 @@ nothing at runtime hotlinks an external URL, and a duel never waits on this.
     python scripts/sync_card_images.py --dry-run     # what would be fetched
     python scripts/sync_card_images.py               # fetch missing only
 
-UNVERIFIED: the provider endpoint below has not been exercised from this
-environment -- outbound access to the image host is blocked here, so the URL
-template and any rate limits come from the provider's published description
-rather than observation.  Confirm them, and the provider's current terms,
-before running a real sync.
+Provider policy (verified against https://ygoprodeck.com/api-guide/):
+the API is v7, card images are addressed by card ID, consumers must **not**
+continually hotlink the provider's images, and images should be downloaded once
+and stored locally.  That requirement is why this script exists and why nothing
+at runtime points at the remote host.
+
+Runtime status: UNVERIFIED **in this container only** -- its egress proxy blocks
+the image host, so no real download has executed here.  The endpoint shape and
+usage policy above are externally confirmed; the first genuine sync simply has to
+run from a machine with outbound access.
+
+The 1.5s pacing below is deliberately far more conservative than the documented
+rate limit.  For a one-off run of ~110 images there is nothing to gain by
+raising it.
 """
 
 from __future__ import annotations

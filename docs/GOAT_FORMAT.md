@@ -460,10 +460,45 @@ manifest, resolves each engine variant to a physical image id, skips anything
 already cached, rate-limits, retries conservatively, and records provenance in
 `manifest.json`. Duel startup never depends on it.
 
-> **UNVERIFIED:** this environment's egress proxy blocks the image host (403),
-> so the downloader has never run against the live service. The URL template and
-> rate limits come from the provider's published description, not observation.
-> Confirm the provider's current terms before a real sync.
+#### Why images are cached locally (provider policy — verified)
+
+YGOPRODeck's API guide (<https://ygoprodeck.com/api-guide/>) states:
+
+* the API is **v7**, and card image URLs are addressed **by card ID**,
+* consumers **must not continually hotlink** the provider's images,
+* images should be **downloaded once and stored/re-hosted locally**,
+* unnecessary repeated API calls should be avoided.
+
+That is the reason for this design, not a preference: local cache, sync on
+setup, no runtime hotlink, and a placeholder when an asset is absent. Please
+keep it that way, and do not reintroduce a live image URL into the render path.
+
+The 1.5-second pacing in the sync script is far more conservative than the
+documented rate limit. For a one-off run of ~110 images there is no reason to
+speed it up, so leave it alone.
+
+#### What is and is not verified
+
+| | |
+| --- | --- |
+| **Policy — verified** | Endpoint/image URL shape, v7 API, local-caching requirement and no-hotlinking rule confirmed against the provider's published API guide. |
+| **Runtime — unverified in this container** | The environment's egress proxy blocks the image host (403), so no real download has ever executed here. The first genuine sync must run from a machine with outbound access. |
+
+The distinction matters: the *design* is settled and externally confirmed; only
+the *execution* is outstanding.
+
+#### Pre-existing behaviour worth knowing about
+
+`backend/card_service.py` predates this milestone and already serves card images
+through `/api/cards/<id>/image`, fetching from the provider **on first view** and
+caching to `backend/.cache/card_images/`. The frontend is never handed a remote
+URL, so this is not hotlinking, and the fetch happens once per card. But it does
+mean a card the sync script has not pre-cached triggers a download the first
+time somebody looks at it.
+
+Left as-is deliberately -- it was not in this milestone's scope. If we want a
+strictly offline render path, the fix is to have that endpoint consult the
+synced `resources/card_assets/` manifest before reaching out at all.
 
 ### The visibility boundary
 

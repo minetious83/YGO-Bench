@@ -250,10 +250,12 @@ def legal_actions_from_pending(
         )
 
     # De-duplicate by payload, keeping the first position.  The passive entry is
-    # emitted first and can carry the same payload as a concrete choice (the
-    # upstream passive response for a select/unselect prompt is literally
-    # "pick index 0"), so a plain first-wins drop would delete that choice from
-    # the action set and leave it unreachable.  Merge the labels instead.
+    # emitted first and can carry the same payload as a concrete choice -- the
+    # upstream passive response for a select/unselect prompt is literally "pick
+    # index 0" -- so a plain first-wins drop would delete that choice from the
+    # action set and leave it unreachable.  Keep the concrete description
+    # instead: the action is still the passive response (it is still first), but
+    # describing it as "passive" would hide that choosing it selects a card.
     unique: dict[tuple[str, str], ActionChoice] = {}
     for action in actions:
         key = (action.tool, json.dumps(action.arguments, sort_keys=True))
@@ -261,5 +263,5 @@ def legal_actions_from_pending(
         if existing is None:
             unique[key] = action
         elif existing.label == PASSIVE_LABEL and action.label:
-            unique[key] = replace(existing, label=f"{PASSIVE_LABEL} / {action.label}")
+            unique[key] = replace(existing, label=action.label)
     return tuple(unique.values())

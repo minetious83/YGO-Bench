@@ -220,8 +220,7 @@ def test_passive_entry_never_hides_a_concrete_choice() -> None:
 
     For select/unselect prompts the upstream passive response is literally
     "pick index 0".  De-duplicating first-wins would delete that choice from the
-    action set, leaving the first selectable card unreachable and making the
-    passive entry silently perform a selection under a misleading label.
+    action set, leaving the first selectable card unreachable.
     """
 
     decision = {
@@ -236,35 +235,63 @@ def test_passive_entry_never_hides_a_concrete_choice() -> None:
     assert {"index": 0} in payloads
     assert {"index": 1} in payloads
 
-    merged = next(action for action in actions if action.arguments == {"index": 0})
-    assert "passive / first legal" in merged.label
-    assert "Magician of Faith" in merged.label
-
     # Every selectable card is reachable by name.
     labels = " | ".join(action.label for action in actions)
     assert "Magician of Faith" in labels and "Spirit Reaper" in labels
 
 
-def test_select_unselect_labels_distinguish_select_from_unselect() -> None:
+def test_choosing_the_first_card_does_not_require_a_passive_labelled_action() -> None:
+    """Picking the first selectable card must read as selecting it.
+
+    The colliding action is still the passive response positionally, but calling
+    it "passive" would hide the fact that choosing it selects a card.
+    """
+
     decision = {
         "responder": "select_unselect_card",
-        "selectable_cards": [{"name": "Spirit Reaper"}],
-        "selected_cards": [{"name": "Magician of Faith"}],
+        "selectable_cards": [{"name": "Magician of Faith"}, {"name": "Spirit Reaper"}],
+        "selected_cards": [],
+        "finishable": False,
+    }
+    actions = _action_set(decision, {"index": 0})
+
+    first = next(action for action in actions if action.arguments == {"index": 0})
+    assert first.label == "select Magician of Faith"
+    assert "passive" not in first.label
+    # No action anywhere in the set is left with only the generic label.
+    assert all(action.label != "passive / first legal" for action in actions)
+
+
+def test_merged_labels_are_deterministic_across_identical_prompts() -> None:
+    decision = {
+        "responder": "select_unselect_card",
+        "selectable_cards": [{"name": "Magician of Faith"}, {"name": "Spirit Reaper"}],
+        "selected_cards": [],
+        "finishable": True,
+    }
+    first = _action_set(decision, {"index": 0})
+    second = _action_set(decision, {"index": 0})
+
+    assert [(a.tool, a.arguments, a.label) for a in first] == [
+        (a.tool, a.arguments, a.label) for a in second
+    ]
+
+
+def test_distinct_payloads_are_never_collapsed_together() -> None:
+    """Only identical payloads merge; different indices stay separate actions."""
+
+    decision = {
+        "responder": "select_unselect_card",
+        "selectable_cards": [{"name": "A"}, {"name": "B"}, {"name": "C"}],
+        "selected_cards": [{"name": "D"}],
         "finishable": True,
     }
     actions = _action_set(decision, {"index": None})
-    labels = [action.label for action in actions]
 
-    assert any(label == "select Spirit Reaper" for label in labels)
-    assert any(label == "unselect Magician of Faith" for label in labels)
-    # index 0 selects, index 1 toggles the already-selected card back off.
-    by_index = {
-        action.arguments.get("index"): action.label
-        for action in actions
-        if "index" in action.arguments
-    }
-    assert by_index[0].endswith("select Spirit Reaper")
-    assert by_index[1] == "unselect Magician of Faith"
+    indices = [a.arguments.get("index") for a in actions]
+    assert sorted(i for i in indices if i is not None) == [0, 1, 2, 3]
+    assert indices.count(None) == 1  # the single finish/cancel action
+    assert len({(a.tool, str(a.arguments)) for a in actions}) == len(actions)
 
 
 def test_reference_decks_have_the_declared_shape() -> None:

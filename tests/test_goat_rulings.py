@@ -472,3 +472,264 @@ def test_sinister_serpent_returns_from_the_graveyard_in_the_standby_phase() -> N
         assert "Sinister Serpent (Pre-Errata)" not in [
             c["name"] for c in duel.observation(0)["you"]["graveyard"]
         ]
+
+
+# --------------------------------------------------------------------------
+# Batch 3: traps, lifecycles, the Damage Step and chains
+# --------------------------------------------------------------------------
+
+
+def test_ring_of_destruction_is_not_activatable_on_the_turn_it_is_set() -> None:
+    with GoatDuel(
+        deck1=stack("Ring of Destruction"), deck2=stack("Luster Dragon"), seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("set_spell", "Ring of Destruction")
+        duel.resolve()
+        assert not duel.can("activate", "Ring of Destruction")
+
+
+def test_ring_of_destruction_damages_both_players_for_the_targets_attack() -> None:
+    """Pre-errata Ring: destroy a face-up monster, both players take its ATK."""
+
+    with GoatDuel(
+        deck1=stack("Ring of Destruction"), deck2=stack("Luster Dragon"), seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("set_spell", "Ring of Destruction")
+        duel.resolve()
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        assert duel.can("activate", "Ring of Destruction")
+        duel.do("activate", "Ring of Destruction")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+
+        observation = duel.observation(0)
+        # Luster Dragon has 1900 ATK, and the damage is symmetric.
+        assert observation["you"]["lp"] == 6100
+        assert observation["opponent"]["lp"] == 6100
+        assert [c["name"] for c in observation["opponent"]["graveyard"]] == ["Luster Dragon"]
+
+
+def _jinzo_via_premature_burial(duel: GoatDuel) -> None:
+    duel.do("activate", "Graceful Charity")
+    duel.resolve(chooser=prefer("Jinzo"))
+    duel.do("activate", "Premature Burial")
+    duel.resolve(chooser=prefer("Jinzo"))
+
+
+def _opponent_trap_activation_options(with_jinzo: bool) -> list[str]:
+    """Set a Trap for the opponent, then read back what they may activate."""
+
+    with GoatDuel(
+        deck1=stack("Jinzo", "Premature Burial", "Graceful Charity"),
+        deck2=stack("Jar of Greed"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        if with_jinzo:
+            _jinzo_via_premature_burial(duel)
+            assert "Jinzo" in _monsters(duel)
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        duel.do("set_spell", "Jar of Greed")
+        duel.resolve()
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=0)
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        return [
+            (choice.get("card") or {}).get("name", "")
+            for choice in duel.idle_choices()
+            if choice.get("command") == "activate"
+        ]
+
+
+def test_jinzo_removes_trap_activation_from_the_legal_action_set() -> None:
+    """Suppression must be visible in what the engine offers, not only in outcomes."""
+
+    without = _opponent_trap_activation_options(with_jinzo=False)
+    with_jinzo = _opponent_trap_activation_options(with_jinzo=True)
+
+    assert "Jar of Greed" in without
+    assert with_jinzo == []
+
+
+def test_call_of_the_haunted_revives_and_takes_the_monster_with_it() -> None:
+    with GoatDuel(
+        deck1=stack(
+            "Luster Dragon", "Mystical Space Typhoon", "Call of the Haunted", "Graceful Charity"
+        ),
+        deck2=stack("Sangan"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("activate", "Graceful Charity")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+        duel.do("set_spell", "Call of the Haunted")
+        duel.resolve()
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=1)
+        duel.do("to_end_phase")
+        duel.advance_to_idle(player=0)
+
+        duel.do("activate", "Call of the Haunted")
+        duel.resolve(chooser=prefer("Luster Dragon"))
+        assert _monsters(duel) == ["Luster Dragon"]
+
+        # Destroying Call takes the revived monster with it.
+        duel.do("activate", "Mystical Space Typhoon")
+        duel.resolve(chooser=prefer("Call of the Haunted"))
+        assert _monsters(duel) == []
+        graveyard = [c["name"] for c in duel.observation(0)["you"]["graveyard"]]
+        assert "Call of the Haunted" in graveyard
+        assert graveyard.count("Luster Dragon") == 2  # the discarded copy and the revived one
+
+
+def _spirit_reaper_targeted_by(spell: str) -> dict:
+    with GoatDuel(deck1=stack(spell), deck2=stack("Spirit Reaper"), seed=3) as duel:
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Spirit Reaper")
+        duel.do("activate", spell)
+        duel.resolve(chooser=prefer("Spirit Reaper"))
+        return duel.observation(0)
+
+
+def test_targeting_spirit_reaper_destroys_it() -> None:
+    observation = _spirit_reaper_targeted_by("Snatch Steal")
+    assert [c["name"] for c in observation["opponent"]["graveyard"]] == ["Spirit Reaper (GOAT)"]
+    # Destroyed on being targeted, so the equip never takes control of it.
+    assert not [c for c in observation["you"]["monster_zone"] if c and c.get("name")]
+
+
+def test_book_of_moon_flips_spirit_reaper_down_instead_of_destroying_it() -> None:
+    """Engine-observed nuance, recorded rather than assumed.
+
+    Spirit Reaper's self-destroy is a continuous effect ranged to the Monster
+    Zone, so once Book of Moon has flipped it face-down the effect no longer
+    applies when the chain solves and the Reaper survives being targeted.
+    """
+
+    observation = _spirit_reaper_targeted_by("Book of Moon")
+    assert observation["opponent"]["graveyard"] == []
+    face_down = [c for c in observation["opponent"]["monster_zone"] if c and c.get("face_down")]
+    assert [c["position"] for c in face_down] == ["face_down_defense"]
+
+
+def test_spirit_reaper_survives_battle() -> None:
+    with GoatDuel(deck1=stack("Luster Dragon"), deck2=stack("Spirit Reaper"), seed=3) as duel:
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Spirit Reaper")
+        duel.do("summon", "Luster Dragon")
+        duel.resolve()
+        duel.do("to_battle_phase")
+
+        for _ in range(20):
+            if duel.responder() == "select_battlecmd":
+                if not duel.can("attack"):
+                    break
+                duel.do("attack")
+                continue
+            if duel.responder() == "select_idlecmd":
+                break
+            duel.auto()
+
+        observation = duel.observation(0)
+        # 1900 - 300 of battle damage got through, but the Reaper is still there.
+        assert observation["opponent"]["lp"] == 6400
+        assert observation["opponent"]["graveyard"] == []
+
+
+def test_damage_step_suppresses_activations_that_the_battle_step_allows() -> None:
+    """Which windows expose Book of Moon is read from the engine, not listed here.
+
+    The Damage Step is bracketed by the engine's own MSG_DAMAGE_STEP_START /
+    MSG_DAMAGE_STEP_END messages, so no hand-written table of Damage Step legal
+    cards is involved.
+    """
+
+    with GoatDuel(
+        deck1=stack("Book of Moon", "Luster Dragon"), deck2=stack("Gemini Elf"), seed=3
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        _opponent_plays(duel, "summon", "Gemini Elf")
+        duel.do("summon", "Luster Dragon")
+        duel.resolve()
+        assert duel.can("activate", "Book of Moon")
+
+        duel.do("to_battle_phase")
+        in_damage_step = False
+        before: list[bool] = []
+        during: list[bool] = []
+        for _ in range(24):
+            responder = duel.responder()
+            if responder == "select_idlecmd":
+                break
+            if responder == "select_chain" and duel.player == 0:
+                offered = "Book of Moon" in _activatable(duel)
+                (during if in_damage_step else before).append(offered)
+            if responder == "select_battlecmd":
+                if not duel.can("attack"):
+                    break
+                duel.do("attack")
+            else:
+                duel.auto()
+            messages = {event.get("msg_name") for event in duel.events}
+            if "MSG_DAMAGE_STEP_START" in messages:
+                in_damage_step = True
+            if "MSG_DAMAGE_STEP_END" in messages:
+                in_damage_step = False
+
+        assert any(before), "expected Book of Moon before the Damage Step"
+        assert during, "expected at least one Damage Step window"
+        assert not any(during), "Book of Moon must not be activatable in the Damage Step"
+
+
+def test_chain_resolves_last_in_first_out_and_a_stale_target_does_nothing() -> None:
+    """Two links, reverse-order resolution, and link 1 losing its target."""
+
+    with GoatDuel(
+        deck1=stack("Ring of Destruction", "Book of Moon"),
+        deck2=stack("Luster Dragon"),
+        seed=3,
+    ) as duel:
+        duel.advance_to_idle(player=0)
+        duel.do("set_spell", "Ring of Destruction")
+        duel.resolve()
+        _opponent_plays(duel, "summon", "Luster Dragon")
+
+        duel.do("activate", "Book of Moon")  # chain link 1
+        chain_names: list[list[str]] = []
+        responders: list[int] = []
+        for _ in range(20):
+            responder = duel.responder()
+            if responder == "select_idlecmd":
+                break
+            chain = duel.observation().get("chain") or []
+            if chain:
+                chain_names.append([c.get("name", "") for c in chain])
+            if responder == "select_chain":
+                responders.append(duel.player)
+            labels = duel.legal_labels()
+            if responder == "select_card" and any("Luster" in (x or "") for x in labels):
+                duel.choose("Luster Dragon")
+                continue
+            if responder == "select_chain" and any(
+                "Ring of Destruction" in (x or "") for x in labels
+            ):
+                duel.choose("Ring of Destruction")  # chain link 2
+                continue
+            duel.auto()
+
+        assert max(len(names) for names in chain_names) == 2
+        assert ["Book of Moon", "Ring of Destruction (Pre-Errata)"] in chain_names
+        # Both players get a window while the chain is open.
+        assert set(responders) == {0, 1}
+
+        observation = duel.observation(0)
+        # Link 2 (Ring) resolved first: the monster is destroyed and both players
+        # took its ATK...
+        assert (observation["you"]["lp"], observation["opponent"]["lp"]) == (6100, 6100)
+        assert [c["name"] for c in observation["opponent"]["graveyard"]] == ["Luster Dragon"]
+        # ...so link 1 (Book of Moon) resolved with nothing to flip.
+        assert not [c for c in observation["opponent"]["monster_zone"] if c and c.get("position")]

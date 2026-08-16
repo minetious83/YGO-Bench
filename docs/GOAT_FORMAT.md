@@ -185,3 +185,55 @@ they run without a built engine.
 Still queued for batch 3: Ring of Destruction, Jinzo/trap suppression, Call of
 the Haunted lifecycle, Spirit Reaper, Damage Step activation restrictions and
 chain construction/resolution order.
+
+### Batch 3 findings — traps, lifecycles, Damage Step, chains
+
+* **Ring of Destruction (Pre-Errata)** cannot be activated on the turn it is Set,
+  and on resolution destroys the targeted face-up monster and deals its ATK to
+  **both** players (1900 each, taking both to 6100).
+* **Jinzo** removes Trap activation from the *legal action set*, not merely from
+  the outcome: with no Jinzo the opponent is offered `activate Jar of Greed`;
+  with a face-up Jinzo the option is absent entirely.
+* **Call of the Haunted** revives the target, and destroying the Call takes the
+  revived monster with it.
+* **Spirit Reaper** is destroyed when targeted by Snatch Steal -- before the
+  equip can take control of it -- and survives battle (1600 damage through, no
+  graveyard entry). But see the nuance below.
+* **Damage Step restrictions** are real and observable: Book of Moon is offered
+  in the pre-damage chain windows and absent in every window inside the Damage
+  Step. The step is bracketed by the engine's own `MSG_DAMAGE_STEP_START` /
+  `MSG_DAMAGE_STEP_END` messages, so no hand-written table of Damage Step legal
+  cards exists anywhere in the suite.
+* **Chains** build and resolve correctly: a two-link chain (Book of Moon then
+  Ring of Destruction) resolves last-in-first-out, both players get a window
+  while it is open, and link 1 resolves with nothing to do because link 2
+  already destroyed its target.
+
+#### Engine nuance worth knowing: Book of Moon beats Spirit Reaper
+
+Targeting Spirit Reaper with Book of Moon does **not** destroy it -- it is
+simply flipped face-down and survives. Spirit Reaper's self-destroy is a
+continuous effect ranged to `LOCATION_MZONE`, so once the same resolution has
+turned it face-down the effect no longer applies when the chain solves. This is
+recorded as observed engine behaviour rather than asserted from card text.
+
+#### Constant spelling
+
+The battle-step flag really is spelled `DUEL_6_STEP_BATLLE_STEP` -- the typo is
+in Project Ignis's own `ocgapi_constants.h` (line 382), not in our notes. It is
+part of the GOAT mask (0x8), as are `DUEL_SINGLE_CHAIN_IN_DAMAGE_SUBSTEP`,
+`DUEL_TCG_SEGOC_NONPUBLIC` and `DUEL_TCG_SEGOC_FIRSTTRIGGER`.
+
+## Notes for the future AI layer (not implemented yet)
+
+These are recorded for the eventual Duel AI design; no policy is built here.
+
+* **"Optional" does not mean "usually decline."** Thousand-Eyes Restrict's equip
+  is an optional trigger. A generic decline-optional-chains policy summons a 0/0
+  TER and leaves the opponent's monster untouched, throwing away the entire
+  point of the card. The agent will need to distinguish optional
+  value-generating triggers from genuinely skippable ones.
+* **Flip Summon surfaces as `repos`.** The action layer exposes a Flip Summon as
+  a reposition of a Set monster rather than as its own command. That is an
+  action-semantics issue to resolve in the agent abstraction, since a model
+  reasoning about "Flip Summon" will not find a command by that name.

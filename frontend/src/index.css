@@ -247,3 +247,76 @@ footer { height: 52px; border-top: 1px solid var(--line); display: flex; align-i
   .visual-replay-view { width: 96%; }.visual-replay-stage { padding: 8px; overflow-x: auto; }.duel-replay-meta { min-width: 760px; }.duel-theater { min-width: 980px; }.duel-playback { min-width: 760px; }.duel-card-modal > div { grid-template-columns: 1fr; max-height: 92vh; overflow: auto; }.duel-card-modal > div > img { width: 190px; justify-self: center; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
+
+/* --- GOAT card primitives -------------------------------------------------
+   Tap-driven, not hover-driven: every piece of information must be reachable
+   on a touch screen. Hover only ever adds emphasis, never access. */
+
+.goat-card-thumb {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 6px;
+  /* Comfortable touch target on mobile. */
+  min-width: 44px;
+  min-height: 44px;
+}
+.goat-card-thumb:disabled { cursor: default; }
+.goat-card-thumb__art {
+  width: 100%;
+  border-radius: 6px;
+  display: block;
+}
+.goat-card-thumb--sm { width: 56px; }
+.goat-card-thumb--md { width: 84px; }
+.goat-card-thumb.is-hidden .goat-card-thumb__art { filter: brightness(0.75); }
+.goat-card-thumb:focus-visible { outline: 2px solid #8fd3ff; outline-offset: 2px; }
+
+.goat-variant-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  background: #4a3a1f;
+  color: #ffd489;
+}
+
+.goat-card-preview {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 50;
+  padding: 1rem;
+}
+.goat-card-preview__art {
+  max-width: min(90vw, 420px);
+  max-height: 88vh;
+  border-radius: 12px;
+}
+
+.goat-card-detail { display: flex; flex-direction: column; gap: 0.6rem; }
+.goat-card-detail__head { display: flex; align-items: center; gap: 0.5rem; }
+.goat-card-detail__head h3 { margin: 0; font-size: 1.05rem; }
+.goat-card-detail__head button { margin-left: auto; background: none; border: none;
+  color: inherit; font-size: 1.3rem; cursor: pointer; min-width: 44px; min-height: 44px; }
+.goat-card-detail__tabs { display: flex; gap: 0.25rem; }
+.goat-card-detail__tabs button {
+  background: none; border: none; color: inherit; cursor: pointer;
+  padding: 0.45rem 0.75rem; border-bottom: 2px solid transparent; opacity: 0.65;
+}
+.goat-card-detail__tabs button[aria-selected='true'] { opacity: 1; border-bottom-color: #8fd3ff; }
+.goat-card-detail__art { width: 100%; max-width: 300px; border-radius: 10px; }
+.goat-card-detail__stats { margin: 0; font-size: 0.85rem; opacity: 0.85; }
+.goat-card-detail__text { margin: 0; white-space: pre-wrap; font-size: 0.88rem; line-height: 1.45; }
+.goat-card-detail__note { margin: 0; font-size: 0.8rem; opacity: 0.72; }
+
+@media (max-width: 600px) {
+  .goat-card-thumb--md { width: 64px; }
+  .goat-card-detail__art { max-width: 100%; }
+}

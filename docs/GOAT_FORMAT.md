@@ -413,3 +413,76 @@ selection prompts are where the model actually earns its cost.
 Automatic decisions record `decision_source: automatic` and the reason; model
 decisions record the action id, candidates, concise rationale, model, prompt
 version, latency, usage and retry status. Hidden model reasoning is never stored.
+
+## Milestone 0.45 — card visuals (presentation only)
+
+Card artwork and text are a presentation concern. Nothing in
+`ygobench/presentation/` may influence engine behaviour, legality, deck hashes,
+seeds, agent prompts, heuristic state or benchmark results -- a test asserts
+that no module under `engine/`, `agents/` or `bench/` imports it. **An agent
+never receives the JPEG**; it receives the same structured visible information
+it always did.
+
+### Two identities, mapped explicitly
+
+| | |
+| --- | --- |
+| `engine_card_id` | what ocgcore is executing (may be a 5xxxxxxxx GOAT entry) |
+| `display_image_id` | the physical TCG card whose artwork to show |
+
+They differ for the 23 historical entries in our library. The mapping is **not**
+"follow the alias": alias also links genuinely different cards, so following it
+blindly would show `Harpie Lady` artwork for `Harpie Lady 1`. The alias is
+followed only when both entries are the same card under a `(GOAT)` or
+`(Pre-Errata)` qualifier -- the same rule the Forbidden & Limited counter uses.
+
+Historical entries keep **their own text**. Replacing a Pre-Errata Ring of
+Destruction with the modern wording would describe a card the simulator is not
+playing, so the panel shows the engine's text and badges it `GOAT` /
+`Pre-Errata`.
+
+Card text needs no network: the local BabelCDB snapshot covers every field, so
+opening a card panel makes no request.
+
+### Asset scope and storage
+
+| | |
+| --- | --- |
+| unique engine cards (10 decks: Main + Side + Fusion) | 110 |
+| distinct physical image ids | 110 |
+| variants | 87 standard, 19 GOAT, 4 Pre-Errata |
+| entries whose image id differs from the engine id | 23 |
+| estimated cache size | ~6-13 MB |
+
+Images are **not committed**. `resources/card_assets/images/` is gitignored and
+populated by `python scripts/sync_card_images.py`, which reads the deck
+manifest, resolves each engine variant to a physical image id, skips anything
+already cached, rate-limits, retries conservatively, and records provenance in
+`manifest.json`. Duel startup never depends on it.
+
+> **UNVERIFIED:** this environment's egress proxy blocks the image host (403),
+> so the downloader has never run against the live service. The URL template and
+> rate limits come from the provider's published description, not observation.
+> Confirm the provider's current terms before a real sync.
+
+### The visibility boundary
+
+Hidden cards are replaced *before serialisation* with an opaque stub:
+
+```json
+{"visibility": "hidden", "card_back": true}
+```
+
+Sending the full card and letting the UI decline to render it would be a leak,
+because anyone can read the payload. Asset resolution happens strictly after the
+filter, so the image layer cannot become a side channel -- there is no id left
+to resolve, and a test asserts the asset lookup is never even called for a
+hidden card.
+
+### Frontend primitives
+
+`frontend/src/components/GoatCard.tsx` adds `CardThumbnail`, `CardPreview` and
+`CardDetailPanel` (with a scaffolded Rulings tab that makes no live request and
+states the authority order). Interaction is tap-driven with 44px touch targets;
+hover only ever adds emphasis, never access, because mobile is a first-class
+target.

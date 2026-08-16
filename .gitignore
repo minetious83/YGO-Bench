@@ -16,3 +16,6 @@ frontend/vite.config.d.ts
 vendor/yugi-bench/data/
 vendor/yugi-bench/results/
 vendor/yugi-bench/vendor/
+
+# Card artwork is fetched locally by scripts/sync_card_images.py, not committed.
+resources/card_assets/images/

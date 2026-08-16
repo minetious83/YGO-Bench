@@ -70,6 +70,13 @@ class CardEntry:
     name: str
     alias: int
     source: str
+    text: str = ""
+    type_mask: int = 0
+    attack: int | None = None
+    defense: int | None = None
+    level: int = 0
+    race: int = 0
+    attribute: int = 0
 
 
 class CardIndex:
@@ -91,15 +98,28 @@ class CardIndex:
         connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         try:
             rows = connection.execute(
-                "SELECT d.id, d.alias, IFNULL(t.name, '') "
+                "SELECT d.id, d.alias, IFNULL(t.name, ''), IFNULL(t.desc, ''), "
+                "d.type, d.atk, d.def, d.level, d.race, d.attribute "
                 "FROM datas d LEFT JOIN texts t ON t.id = d.id"
             ).fetchall()
         finally:
             connection.close()
-        for code, alias, name in rows:
+        for code, alias, name, text, type_mask, atk, defense, level, race, attribute in rows:
             if not name or code in self._by_code:
                 continue
-            self._by_code[int(code)] = CardEntry(int(code), name, int(alias or 0), path.name)
+            self._by_code[int(code)] = CardEntry(
+                code=int(code),
+                name=name,
+                alias=int(alias or 0),
+                source=path.name,
+                text=text or "",
+                type_mask=int(type_mask or 0),
+                attack=int(atk) if atk is not None and atk >= 0 else None,
+                defense=int(defense) if defense is not None and defense >= 0 else None,
+                level=int(level or 0) & 0xFF,
+                race=int(race or 0),
+                attribute=int(attribute or 0),
+            )
             self._by_name[normalize_name(name)].add(int(code))
 
     def __contains__(self, code: int) -> bool:

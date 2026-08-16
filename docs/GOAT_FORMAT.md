@@ -349,3 +349,67 @@ select/unselect collision. `announce_race` and `announce_attribute` now split
 their bitmask into one named choice per bit. `announce_card`, `announce_number`
 and `select_sum` still have not occurred in a real duel and remain pass-through,
 deliberately un-abstracted until something exercises them.
+
+## External research source: YGOResources (librarian, not referee)
+
+`ygobench/research/ygoresources.py` provides optional access to
+db.ygoresources.com for investigating surprising Project Ignis behaviour and
+assembling ruling evidence. It does **not** replace Project Ignis, CardScripts
+or BabelCDB.
+
+Authority order:
+
+1. Project Ignis / ocgcore GOAT behaviour -- runtime truth for the simulator.
+2. Engine regression tests -- what our installed engine actually does.
+3. Historical GOAT/TCG evidence -- what we expect GOAT behaviour to be.
+4. YGOResources FAQ/Q&A -- supporting and diagnostic evidence only.
+
+YGOResources carries translated **OCG** material, which does not automatically
+govern the historical TCG format we model. `RulingNote` records
+`engine_behaviour`, `historical_expectation` and the supporting Q&A ids with a
+`conflict` flag, so a disagreement is recorded rather than silently resolved.
+
+Enforced in code, not by convention:
+
+* reads are served from `resources/rulings_cache/ygoresources/` and never touch
+  the network; a cache miss offline is an explicit error,
+* network access is opt-in per client and there is no built-in HTTP default, so
+  importing the module cannot cause a request,
+* a session is capped at 25 fetches, and exceeding it raises an error pointing
+  at the maintainers' request to be contacted for bulk needs,
+* `X-Cache-Revision` is stored per document and `/manifest/<revision>`
+  invalidates only the documents that actually changed,
+* a test asserts that nothing under `engine/`, `agents/` or `bench/` imports the
+  package, so no duel or agent decision can ever depend on the network.
+
+> **Unverified:** this environment's egress proxy blocks db.ygoresources.com, so
+> the endpoint paths are taken from the published API description and have not
+> been exercised against the live service. Confirm them from a machine with
+> egress before the first real fetch.
+
+## Milestone 0.5 — `goat_llm_v0_1`
+
+Same input contract as the heuristic: player-visible observation, derived
+strategic state, semantic legal actions in, exactly one of those actions out.
+Every action gets a stable id (`A0`, `A1`, ...) and the model returns one id; an
+id that does not exist is rejected rather than coerced, with one bounded retry
+and then an explicit agent failure. No silent substitution.
+
+### The automatic-decision gate
+
+`ygobench/agents/decision_gate.py` keeps forced and trivial decisions away from
+the model. Measured over the **213,106 decisions** in the clean 300-duel matrix:
+
+| | |
+| --- | --- |
+| automatic | 156,863 |
+| model calls | 56,243 |
+| **model-call reduction** | **73.6%** |
+
+`select_chain` -- 69% of all decisions -- is **94.2% automatic**. Zone and
+position prompts are 100% automatic. Idle, battle, optional-effect and
+selection prompts are where the model actually earns its cost.
+
+Automatic decisions record `decision_source: automatic` and the reason; model
+decisions record the action id, candidates, concise rationale, model, prompt
+version, latency, usage and retry status. Hidden model reasoning is never stored.

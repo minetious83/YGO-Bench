@@ -51,13 +51,14 @@ def test_no_duel_stalls_out_of_its_decision_budget(small_run) -> None:
     """A duel that exhausts the budget never reached a terminal state."""
 
     assert small_run.stalls == []
-    assert {r.termination for r in small_run.records} == {"game_over"}
+    assert {r.termination for r in small_run.records} <= {"game_over", "draw"}
 
 
 def test_termination_is_classified_and_a_winner_recorded(small_run) -> None:
     for record in small_run.records:
         assert record.termination in {
             "game_over",
+            "draw",
             "illegal_action_forfeit",
             "no_pending_decision",
             "decision_budget_exhausted",

@@ -191,3 +191,20 @@ def test_finishing_is_distinguished_from_cancelling_a_selection() -> None:
 
     finish = translate(started, actions).actions[1]
     assert (finish.name, finish.is_decline) == ("finish_selection", False)
+
+
+def test_engine_draw_code_maps_to_no_winning_seat() -> None:
+    """ocgcore reports a draw as MSG_WIN winner=2.
+
+    Indexing the agent tuple with that value crashed the duel runner outright.
+    GOAT reaches draws naturally: Ring of Destruction deals its damage to both
+    players, so a simultaneous 0 LP is a real result, not a failure.
+    """
+
+    from ygobench.engine.full_duel import _normalize_winner
+
+    assert _normalize_winner(0) == 0
+    assert _normalize_winner(1) == 1
+    assert _normalize_winner(2) is None  # draw
+    assert _normalize_winner(None) is None
+    assert _normalize_winner(-1) is None

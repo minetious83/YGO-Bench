@@ -222,6 +222,16 @@ def _enforce_legality(
         raise ValueError(f"Deck(s) illegal for {profile.display_name}:\n- {detail}")
 
 
+def _normalize_winner(winner: Any) -> int | None:
+    """Map the engine's winner code to a seat, or ``None`` for a draw.
+
+    ocgcore uses ``MSG_WIN`` winner=2 for a draw; anything that is not seat 0 or
+    1 has no winning agent.
+    """
+
+    return winner if winner in (0, 1) else None
+
+
 def _passive_fallback(pending: Any, replay_module: Any) -> ActionChoice:
     tool, arguments = replay_module._pick_passive_opponent_response(pending)
     if "ROCK_PAPER_SCISSORS" in str(pending.msg_name).upper():
@@ -436,7 +446,14 @@ def run_duel(
         elif duel.pending is None:
             termination = "no_pending_decision"
         elapsed_total = round(time.perf_counter() - started_at, 3)
-        winner_value = forfeit_winner if forfeit_winner is not None else duel.state.winner
+        winner_value = _normalize_winner(
+            forfeit_winner if forfeit_winner is not None else duel.state.winner
+        )
+        if winner_value is None and duel.state.game_over and forfeit_winner is None:
+            # ocgcore reports a draw as MSG_WIN winner=2 -- both players losing
+            # at once, which GOAT reaches through symmetric Ring of Destruction
+            # damage.  It is a real terminal result, not a failure.
+            termination = "draw"
         logical_game_over = duel.state.game_over or forfeit_winner is not None
         outcome = {
             "type": "outcome",
@@ -465,7 +482,7 @@ def run_duel(
         engine.destroy()
 
     result = FullDuelResult(
-        winner=forfeit_winner if forfeit_winner is not None else duel.state.winner,
+        winner=winner_value,
         game_over=duel.state.game_over or forfeit_winner is not None,
         decisions=decisions,
         turn_count=duel.state.turn_count,

@@ -10,16 +10,21 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from ygobench.agents.action_space import legal_actions_from_pending
 from ygobench.agents.base import BaseAgent
 from ygobench.agents.passive_agent import PassiveAgent
+from ygobench.agents.semantics import translate
+from ygobench.cards import CardIndex
 from ygobench.config import PROJECT_ROOT
 from ygobench.engine.protocol import ActionChoice, DecisionRequest
 from ygobench.engine.upstream import UpstreamLayout
 from ygobench.engine.visibility import sanitize_events_for_player
+from ygobench.formats import FormatProfile, get_format, resolve_duel_flags
+from ygobench.legality import parse_lflist, validate_deck
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,7 @@ class FullDuelResult:
     lp: tuple[int, int]
     termination: str
     replay_path: Path
+    duel_format: str = "mr5"
     agent1: str = "passive"
     agent2: str = "passive"
     illegal_actions: tuple[int, int] = (0, 0)
@@ -74,7 +80,7 @@ def _parse_deck(path: Path) -> dict[str, list[int]]:
     return sections
 
 
-def _create_match(engine, core, *, seed: int, flags: int) -> None:
+def _create_match(engine, core, *, seed: int, flags: int, profile: FormatProfile) -> None:
     rng = random.Random(seed)
     options = core.OCG_DuelOptions()
     options.seed0 = rng.getrandbits(64)
@@ -82,8 +88,13 @@ def _create_match(engine, core, *, seed: int, flags: int) -> None:
     options.seed2 = rng.getrandbits(64)
     options.seed3 = rng.getrandbits(64)
     options.flags = flags
-    options.team1 = core.OCG_Player(startingLP=8000, startingDrawCount=5, drawCountPerTurn=1)
-    options.team2 = core.OCG_Player(startingLP=8000, startingDrawCount=5, drawCountPerTurn=1)
+    player = lambda: core.OCG_Player(  # noqa: E731 - both teams share the profile
+        startingLP=profile.starting_lp,
+        startingDrawCount=profile.starting_hand,
+        drawCountPerTurn=profile.draw_per_turn,
+    )
+    options.team1 = player()
+    options.team2 = player()
     options.cardReader = engine._make_card_reader()
     options.payload1 = None
     options.scriptReader = engine._make_script_reader()
@@ -102,6 +113,22 @@ def _create_match(engine, core, *, seed: int, flags: int) -> None:
     engine._log_messages = []
     engine._load_script("constant.lua")
     engine._load_script("utility.lua")
+
+
+def _shuffled_main(main: list[int], *, seed: int, player: int) -> list[int]:
+    """Return the Main Deck in randomized-but-reproducible order.
+
+    ocgcore does not shuffle at duel start -- it expects the host application to
+    supply an already-randomized deck (EDOPro shuffles client-side before
+    calling ``OCG_DuelNewCard``).  Without this the engine deals the same opening
+    hand to both players in every duel with the same decklists.
+
+    The order is derived from the duel seed, so runs stay reproducible.
+    """
+
+    order = list(main)
+    random.Random(f"{seed}:{player}").shuffle(order)
+    return order
 
 
 def _add_deck(engine, core, *, player: int, deck: dict[str, list[int]]) -> None:
@@ -157,6 +184,54 @@ def _normalize_action(action: ActionChoice, core: Any, tools_module: Any) -> dic
     return tools_module.coerce_args(action.tool, args)
 
 
+@lru_cache(maxsize=4)
+def _legality_context(profile: FormatProfile):
+    """Card index plus limit list for a format, or ``None`` if it has no lflist."""
+
+    if profile.lflist_path is None:
+        return None
+    return CardIndex(UpstreamLayout().card_database_dir), parse_lflist(profile.lflist_path)
+
+
+def _enforce_legality(
+    profile: FormatProfile, decks: dict[str, dict[str, list[int]]]
+) -> None:
+    """Reject illegal decks before the duel is created.
+
+    ocgcore performs no deck validation, so this is the only gate.
+    """
+
+    context = _legality_context(profile)
+    if context is None:
+        return
+    index, limit_list = context
+    failures: list[str] = []
+    for deck_id, sections in decks.items():
+        result = validate_deck(
+            deck_id=deck_id,
+            main=sections["main"],
+            side=sections["side"],
+            extra=sections["extra"],
+            profile=profile,
+            index=index,
+            limit_list=limit_list,
+        )
+        failures += [f"{deck_id}: {error}" for error in result.errors]
+    if failures:
+        detail = "\n- ".join(failures)
+        raise ValueError(f"Deck(s) illegal for {profile.display_name}:\n- {detail}")
+
+
+def _normalize_winner(winner: Any) -> int | None:
+    """Map the engine's winner code to a seat, or ``None`` for a draw.
+
+    ocgcore uses ``MSG_WIN`` winner=2 for a draw; anything that is not seat 0 or
+    1 has no winning agent.
+    """
+
+    return winner if winner in (0, 1) else None
+
+
 def _passive_fallback(pending: Any, replay_module: Any) -> ActionChoice:
     tool, arguments = replay_module._pick_passive_opponent_response(pending)
     if "ROCK_PAPER_SCISSORS" in str(pending.msg_name).upper():
@@ -174,9 +249,17 @@ def run_duel(
     max_decisions: int = 2000,
     output_dir: Path | None = None,
     replay_name: str | None = None,
+    duel_format: str | FormatProfile | None = None,
+    enforce_legality: bool = True,
+    shuffle_decks: bool = True,
 ) -> FullDuelResult:
-    """Run one complete match and write a replayable evidence trace."""
+    """Run one complete match and write a replayable evidence trace.
 
+    ``duel_format`` selects the ruleset (see :mod:`ygobench.formats`); it
+    defaults to Master Rule 5 so existing callers are unaffected.
+    """
+
+    profile = get_format(duel_format)
     started_at = time.perf_counter()
     layout, core, harness_module, replay_module, state_module, tools_module = _load_upstream()
     card_db = core.CardDB(layout.root / "vendor" / "distribution" / "expansions")
@@ -211,7 +294,13 @@ def run_duel(
     try:
         deck1 = _parse_deck(deck1_path)
         deck2 = _parse_deck(deck2_path)
-        _create_match(engine, core, seed=seed, flags=core.DUEL_MODE_MR5)
+        if enforce_legality:
+            _enforce_legality(profile, {deck1_path.stem: deck1, deck2_path.stem: deck2})
+        flags = resolve_duel_flags(profile, core)
+        _create_match(engine, core, seed=seed, flags=flags, profile=profile)
+        if shuffle_decks:
+            deck1 = {**deck1, "main": _shuffled_main(deck1["main"], seed=seed, player=0)}
+            deck2 = {**deck2, "main": _shuffled_main(deck2["main"], seed=seed, player=1)}
         _add_deck(engine, core, player=0, deck=deck1)
         _add_deck(engine, core, player=1, deck=deck2)
         log(
@@ -225,10 +314,12 @@ def run_duel(
                     getattr(agent1, "provider_config", {"name": agent1.name}),
                     getattr(agent2, "provider_config", {"name": agent2.name}),
                 ],
-                "rules": "MR5",
-                "starting_lp": 8000,
-                "starting_hand": 5,
-                "draw_per_turn": 1,
+                "rules": profile.id,
+                "format": profile.to_dict(),
+                "duel_flags": flags,
+                "starting_lp": profile.starting_lp,
+                "starting_hand": profile.starting_hand,
+                "draw_per_turn": profile.draw_per_turn,
                 "prompt_template": "full_duel_system.md@v1",
             }
         )
@@ -267,7 +358,15 @@ def run_duel(
                 legal_actions=legal_actions,
                 decision_type=str(observation.get("decision", {}).get("responder", "")),
             )
-            log({"type": "observation", "player": player, "state": observation})
+            semantic = translate(observation.get("decision", {}) or {}, legal_actions)
+            log(
+                {
+                    "type": "observation",
+                    "player": player,
+                    "state": observation,
+                    "semantic_actions": semantic.to_dict(),
+                }
+            )
             agent = agents[player]
             call_started = time.perf_counter()
             agent_error: str | None = None
@@ -347,7 +446,14 @@ def run_duel(
         elif duel.pending is None:
             termination = "no_pending_decision"
         elapsed_total = round(time.perf_counter() - started_at, 3)
-        winner_value = forfeit_winner if forfeit_winner is not None else duel.state.winner
+        winner_value = _normalize_winner(
+            forfeit_winner if forfeit_winner is not None else duel.state.winner
+        )
+        if winner_value is None and duel.state.game_over and forfeit_winner is None:
+            # ocgcore reports a draw as MSG_WIN winner=2 -- both players losing
+            # at once, which GOAT reaches through symmetric Ring of Destruction
+            # damage.  It is a real terminal result, not a failure.
+            termination = "draw"
         logical_game_over = duel.state.game_over or forfeit_winner is not None
         outcome = {
             "type": "outcome",
@@ -376,13 +482,14 @@ def run_duel(
         engine.destroy()
 
     result = FullDuelResult(
-        winner=forfeit_winner if forfeit_winner is not None else duel.state.winner,
+        winner=winner_value,
         game_over=duel.state.game_over or forfeit_winner is not None,
         decisions=decisions,
         turn_count=duel.state.turn_count,
         lp=tuple(duel.state.lp),
         termination=termination,
         replay_path=replay_path,
+        duel_format=profile.id,
         agent1=agent1.name,
         agent2=agent2.name,
         illegal_actions=tuple(illegal),

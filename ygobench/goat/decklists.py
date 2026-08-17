@@ -1,0 +1,608 @@
+"""Locked GOAT v1 reference decklists.
+
+These are the authoritative baselines supplied for GOAT AI Trainer v1.  They are
+stored as card *names*; ids are derived from the pinned card database by
+:mod:`ygobench.goat.build`.
+
+These lists are reference baselines, not canonical definitions of their
+archetypes.  Do not optimise, substitute or "fix" cards here without explicit
+approval -- if a list fails validation, report the discrepancy rather than
+editing the list to make the check pass.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+Entry = tuple[int, str]
+
+FUSION_TOOLBOX_ID = "GOAT_FUSION_TOOLBOX_V1"
+
+#: TCG print names that Project Ignis stores under a different (OCG-faithful)
+#: name.  These are *the same physical card*, verified by passcode -- not
+#: substitutions of a similar card.  The decklists above keep the name the
+#: player wrote; resolution falls back to this table only when the literal name
+#: matches nothing, and every application is reported by the deck builder.
+NAME_ALIASES: dict[str, str] = {
+    # Passcode 79853073. "Kinetic Soldier" is the TCG name; Project Ignis and
+    # the April 2005 GOAT pool store it as "Cipher Soldier" (504700139).
+    "Kinetic Soldier": "Cipher Soldier",
+}
+
+#: A literal 22-card Fusion Deck.  GOAT Format predates the 15-card Extra Deck
+#: limit, so this is intentionally larger than a modern Extra Deck.
+GOAT_FUSION_TOOLBOX_V1: tuple[Entry, ...] = (
+    (3, "Thousand-Eyes Restrict"),
+    (1, "Dragoness the Wicked Knight"),
+    (1, "Flame Ghost"),
+    (1, "Darkfire Dragon"),
+    (2, "Dark Balter the Terrible"),
+    (1, "Fiend Skull Dragon"),
+    (1, "Reaper on the Nightmare"),
+    (1, "Giltia the D. Knight"),
+    (2, "Ryu Senshi"),
+    (2, "Dark Blade the Dragon Knight"),
+    (1, "Ojama King"),
+    (1, "Dark Flare Knight"),
+    (1, "Roaring Ocean Snake"),
+    (1, "King Dragun"),
+    (1, "The Last Warrior from Another Planet"),
+    (1, "Twin-Headed Thunder Dragon"),
+    (1, "Gatling Dragon"),
+)
+
+
+@dataclass(frozen=True)
+class ReferenceDeck:
+    id: str
+    display_name: str
+    archetype: str
+    strategic_identity: str
+    main: tuple[Entry, ...]
+    side: tuple[Entry, ...]
+    fusion_reference: str | None
+    version: int = 1
+    notes: str = ""
+
+
+CHAOS_CONTROL_V1 = ReferenceDeck(
+    id="CHAOS_CONTROL_V1",
+    display_name="Chaos Control",
+    archetype="Chaos / Control",
+    strategic_identity="Chaos + Goat/Metamorphosis/Creature Swap control.",
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (2, "Chaos Sorcerer"),
+        (3, "Thunder Dragon"),
+        (2, "Gravekeeper's Spy"),
+        (2, "Magician of Faith"),
+        (1, "Night Assailant"),
+        (1, "Sinister Serpent"),
+        (1, "Sangan"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Tsukuyomi"),
+        (1, "Spirit Reaper"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (1, "Premature Burial"),
+        (3, "Scapegoat"),
+        (2, "Metamorphosis"),
+        (2, "Creature Swap"),
+        (1, "Book of Moon"),
+        (1, "Nobleman of Crossout"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (2, "Jar of Greed"),
+        (1, "Raigeki Break"),
+        (1, "Trap Dustshoot"),
+    ),
+    side=(
+        (2, "Zombyra the Dark"),
+        (2, "Giant Orc"),
+        (2, "Sakuretsu Armor"),
+        (1, "Kinetic Soldier"),
+        (2, "Dust Tornado"),
+        (1, "Nobleman of Crossout"),
+        (1, "Book of Moon"),
+        (1, "Jinzo"),
+        (1, "Mobius the Frost Monarch"),
+        (1, "Asura Priest"),
+        (1, "Royal Decree"),
+    ),
+    fusion_reference=FUSION_TOOLBOX_ID,
+)
+
+WARRIOR_V1 = ReferenceDeck(
+    id="WARRIOR_V1",
+    display_name="Warrior",
+    archetype="Warrior / Anti-Meta",
+    strategic_identity="Warrior tempo / anti-meta.",
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (3, "Blade Knight"),
+        (2, "Skilled Dark Magician"),
+        (1, "D.D. Warrior Lady"),
+        (1, "D.D. Assailant"),
+        (1, "Exiled Force"),
+        (1, "Mystic Swordsman LV2"),
+        (1, "Don Zaloog"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Kycoo the Ghost Destroyer"),
+        (2, "Reinforcement of the Army"),
+        (2, "Nobleman of Crossout"),
+        (2, "Book of Moon"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Premature Burial"),
+        (1, "Snatch Steal"),
+        (3, "Solemn Judgment"),
+        (2, "Sakuretsu Armor"),
+        (2, "Trap Dustshoot"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (1, "Call of the Haunted"),
+        (1, "Dust Tornado"),
+        (1, "Xing Zhen Hu"),
+    ),
+    side=(
+        (2, "Kinetic Soldier"),
+        (1, "Kycoo the Ghost Destroyer"),
+        (2, "Mind Control"),
+        (2, "Dust Tornado"),
+        (1, "Asura Priest"),
+        (1, "Jinzo"),
+        (1, "Mobius the Frost Monarch"),
+        (2, "Gravekeeper's Spy"),
+        (2, "Magician of Faith"),
+        (1, "Chaos Sorcerer"),
+    ),
+    fusion_reference=None,
+)
+
+CHAOS_TURBO_V1 = ReferenceDeck(
+    id="CHAOS_TURBO_V1",
+    display_name="Chaos Turbo",
+    archetype="Chaos / Aggro",
+    strategic_identity="Aggressive Chaos Turbo/resource engine.",
+    notes=(
+        "Preserve the deliberate 0 Dekoichi / 2 Gravekeeper's Spy / "
+        "2 Zombyra the Dark / 3 Jar of Greed configuration."
+    ),
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (3, "Chaos Sorcerer"),
+        (3, "Thunder Dragon"),
+        (2, "Gravekeeper's Spy"),
+        (2, "Zombyra the Dark"),
+        (2, "Magician of Faith"),
+        (2, "Night Assailant"),
+        (1, "Sangan"),
+        (1, "Sinister Serpent"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Tsukuyomi"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (2, "Nobleman of Crossout"),
+        (1, "Card Destruction"),
+        (1, "Upstart Goblin"),
+        (3, "Jar of Greed"),
+        (2, "Raigeki Break"),
+        (1, "Phoenix Wing Wind Blast"),
+        (2, "Trap Dustshoot"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+    ),
+    side=(
+        (2, "Scapegoat"),
+        (1, "Metamorphosis"),
+        (1, "Creature Swap"),
+        (3, "Sakuretsu Armor"),
+        (1, "Kinetic Soldier"),
+        (1, "Giant Orc"),
+        (2, "Dust Tornado"),
+        (1, "Mobius the Frost Monarch"),
+        (1, "Book of Moon"),
+        (1, "Swords of Revealing Light"),
+        (1, "Royal Decree"),
+    ),
+    fusion_reference=None,
+)
+
+CHAOS_WARRIOR_V1 = ReferenceDeck(
+    id="CHAOS_WARRIOR_V1",
+    display_name="Chaos Warrior",
+    archetype="Chaos / Warrior Hybrid",
+    strategic_identity="Warrior tempo + Chaos hybrid.",
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (2, "Chaos Sorcerer"),
+        (3, "Thunder Dragon"),
+        (2, "Blade Knight"),
+        (1, "Skilled Dark Magician"),
+        (1, "D.D. Warrior Lady"),
+        (1, "D.D. Assailant"),
+        (1, "Exiled Force"),
+        (1, "Mystic Swordsman LV2"),
+        (1, "Don Zaloog"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Sangan"),
+        (1, "Sinister Serpent"),
+        (1, "Magician of Faith"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (1, "Premature Burial"),
+        (2, "Reinforcement of the Army"),
+        (2, "Nobleman of Crossout"),
+        (1, "Book of Moon"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (2, "Sakuretsu Armor"),
+        (2, "Trap Dustshoot"),
+        (1, "Raigeki Break"),
+        (1, "Jar of Greed"),
+    ),
+    side=(
+        (2, "Scapegoat"),
+        (1, "Metamorphosis"),
+        (1, "Creature Swap"),
+        (2, "Gravekeeper's Spy"),
+        (1, "Magician of Faith"),
+        (1, "Chaos Sorcerer"),
+        (2, "Zombyra the Dark"),
+        (2, "Dust Tornado"),
+        (1, "Jinzo"),
+        (1, "Mobius the Frost Monarch"),
+        (1, "Royal Decree"),
+    ),
+    fusion_reference=None,
+)
+
+GOAT_CONTROL_V1 = ReferenceDeck(
+    id="GOAT_CONTROL_V1",
+    display_name="Goat Control",
+    archetype="Control",
+    strategic_identity="Classic Goat/TER/Tsukuyomi control.",
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (1, "Airknight Parshath"),
+        (1, "Jinzo"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "D.D. Warrior Lady"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Sangan"),
+        (1, "Sinister Serpent"),
+        (2, "Magician of Faith"),
+        (2, "Tsukuyomi"),
+        (1, "Asura Priest"),
+        (1, "Exiled Force"),
+        (1, "Don Zaloog"),
+        (1, "Blade Knight"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (1, "Premature Burial"),
+        (3, "Scapegoat"),
+        (3, "Metamorphosis"),
+        (2, "Book of Moon"),
+        (2, "Nobleman of Crossout"),
+        (1, "Creature Swap"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (1, "Call of the Haunted"),
+        (2, "Dust Tornado"),
+    ),
+    side=(
+        (2, "Kinetic Soldier"),
+        (2, "Kycoo the Ghost Destroyer"),
+        (1, "Zombyra the Dark"),
+        (1, "Mobius the Frost Monarch"),
+        (1, "Mystic Swordsman LV2"),
+        (1, "Swords of Revealing Light"),
+        (2, "Sakuretsu Armor"),
+        (1, "Dust Tornado"),
+        (2, "Royal Decree"),
+        (1, "Ceasefire"),
+        (1, "Mind Control"),
+    ),
+    fusion_reference=FUSION_TOOLBOX_ID,
+)
+
+PANDA_BURN_V1 = ReferenceDeck(
+    id="PANDA_BURN_V1",
+    display_name="Panda Burn",
+    archetype="Burn / Stall",
+    strategic_identity="Burn / stall / LP pressure.",
+    main=(
+        (3, "Gyaku-Gire Panda"),
+        (3, "Gravekeeper's Spy"),
+        (2, "Gravekeeper's Guard"),
+        (2, "Des Koala"),
+        (2, "Stealth Bird"),
+        (1, "Sangan"),
+        (1, "Sinister Serpent"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Tsukuyomi"),
+        (1, "Injection Fairy Lily"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (2, "Book of Moon"),
+        (2, "Level Limit - Area B"),
+        (1, "Swords of Revealing Light"),
+        (1, "Wave-Motion Cannon"),
+        (2, "Chain Energy"),
+        (1, "Ring of Destruction"),
+        (1, "Mirror Force"),
+        (1, "Torrential Tribute"),
+        (2, "Secret Barrel"),
+        (2, "Just Desserts"),
+        (2, "Gravity Bind"),
+        (1, "Magic Cylinder"),
+        (1, "Ceasefire"),
+    ),
+    side=(
+        # v1.1: -1 Ceasefire, -1 Magic Cylinder (both Limited and already in the
+        # Main Deck), +1 Dust Tornado, +1 Solemn Judgment.
+        (2, "Lava Golem"),
+        (2, "King Tiger Wanghu"),
+        (3, "Dust Tornado"),
+        (3, "Solemn Judgment"),
+        (2, "Sakuretsu Armor"),
+        (1, "Wave-Motion Cannon"),
+        (1, "Chain Energy"),
+        (1, "Royal Decree"),
+    ),
+    fusion_reference=None,
+)
+
+REASONING_GATE_TURBO_V1 = ReferenceDeck(
+    id="REASONING_GATE_TURBO_V1",
+    display_name="Reasoning Gate Turbo",
+    archetype="Combo",
+    strategic_identity="Reasoning/Monster Gate explosive combo.",
+    notes=(
+        "This archetype may later warrant a specialised Fusion configuration "
+        "because of its unusual Metamorphosis levels. Do not alter V1 yet."
+    ),
+    main=(
+        (1, "Dark Magician of Chaos"),
+        (3, "Fusilier Dragon, the Dual-Mode Beast"),
+        (2, "Sacred Crane"),
+        (2, "Airknight Parshath"),
+        (1, "Jinzo"),
+        (1, "Blowback Dragon"),
+        (1, "Spell Canceller"),
+        (1, "Cyber Jar"),
+        (1, "Magical Merchant"),
+        (1, "Sangan"),
+        (3, "Reasoning"),
+        (3, "Monster Gate"),
+        (3, "Metamorphosis"),
+        (3, "Giant Trunade"),
+        (2, "Scapegoat"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Premature Burial"),
+        (1, "Snatch Steal"),
+        (1, "Dimension Fusion"),
+        (1, "Card Destruction"),
+        (1, "Nobleman of Crossout"),
+        (1, "Ring of Destruction"),
+        (1, "Call of the Haunted"),
+        (1, "Torrential Tribute"),
+    ),
+    side=(
+        # v1.1: -1 Jinzo (Limited and already in the Main Deck), +1 Mobius.
+        (3, "Mobius the Frost Monarch"),
+        (2, "Mystic Swordsman LV2"),
+        (2, "Royal Decree"),
+        (2, "Dust Tornado"),
+        (2, "Book of Moon"),
+        (2, "Sakuretsu Armor"),
+        (1, "Swords of Revealing Light"),
+        (1, "Ceasefire"),
+    ),
+    fusion_reference=FUSION_TOOLBOX_ID,
+)
+
+CHAOS_RETURN_V1 = ReferenceDeck(
+    id="CHAOS_RETURN_V1",
+    display_name="Chaos Return",
+    archetype="Chaos / Combo",
+    strategic_identity="Chaos banish management + Return lethal turns.",
+    main=(
+        (1, "Black Luster Soldier - Envoy of the Beginning"),
+        (3, "Chaos Sorcerer"),
+        (3, "Thunder Dragon"),
+        (2, "Gravekeeper's Spy"),
+        (2, "Dekoichi the Battlechanted Locomotive"),
+        (2, "Magician of Faith"),
+        (2, "Giant Orc"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "D.D. Warrior Lady"),
+        (1, "Sangan"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (2, "Nobleman of Crossout"),
+        (2, "Book of Moon"),
+        (1, "Premature Burial"),
+        (3, "Return from the Different Dimension"),
+        (3, "Solemn Judgment"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (1, "Ceasefire"),
+    ),
+    side=(
+        (2, "Kycoo the Ghost Destroyer"),
+        (2, "Zombyra the Dark"),
+        (2, "Kinetic Soldier"),
+        (2, "Dust Tornado"),
+        (2, "Sakuretsu Armor"),
+        (1, "Mobius the Frost Monarch"),
+        (1, "Jinzo"),
+        (1, "Swords of Revealing Light"),
+        (1, "Royal Decree"),
+        (1, "Book of Moon"),
+    ),
+    fusion_reference=None,
+)
+
+SOUL_CONTROL_V1 = ReferenceDeck(
+    id="SOUL_CONTROL_V1",
+    display_name="Soul Control",
+    archetype="Monarch / Control",
+    strategic_identity="Tribute/resource conversion via Soul Exchange.",
+    main=(
+        (3, "Thestalos the Firestorm Monarch"),
+        (3, "Mobius the Frost Monarch"),
+        (3, "Dekoichi the Battlechanted Locomotive"),
+        (2, "Magician of Faith"),
+        (2, "Gravekeeper's Spy"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Sangan"),
+        (1, "Sinister Serpent"),
+        (1, "Tribe-Infecting Virus"),
+        (3, "Soul Exchange"),
+        (2, "Metamorphosis"),
+        (2, "Book of Moon"),
+        (2, "Scapegoat"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (1, "Premature Burial"),
+        (1, "Nobleman of Crossout"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (1, "Call of the Haunted"),
+        (2, "Sakuretsu Armor"),
+    ),
+    side=(
+        (2, "Zaborg the Thunder Monarch"),
+        (1, "Jinzo"),
+        (2, "Kinetic Soldier"),
+        (2, "Kycoo the Ghost Destroyer"),
+        (2, "Dust Tornado"),
+        (1, "Nobleman of Crossout"),
+        (1, "Book of Moon"),
+        (1, "Scapegoat"),
+        (1, "Metamorphosis"),
+        (1, "Royal Decree"),
+        (1, "Swords of Revealing Light"),
+    ),
+    fusion_reference=FUSION_TOOLBOX_ID,
+)
+
+EARTH_BEAT_V1 = ReferenceDeck(
+    id="EARTH_BEAT_V1",
+    display_name="Earth Beat",
+    archetype="Earth / Aggro",
+    strategic_identity="Earth aggro / combat pressure.",
+    main=(
+        (3, "Giant Rat"),
+        (3, "Berserk Gorilla"),
+        (3, "Gigantes"),
+        # v1.1: Injection Fairy Lily is Limited, so 2 -> 1; the freed slot goes
+        # to a third Enraged Battle Ox to keep the Earth beatdown curve intact.
+        (3, "Enraged Battle Ox"),
+        (1, "Injection Fairy Lily"),
+        (1, "Exiled Force"),
+        (1, "D.D. Assailant"),
+        (1, "Tribe-Infecting Virus"),
+        (1, "Sangan"),
+        (1, "Breaker the Magical Warrior"),
+        (1, "Pot of Greed"),
+        (1, "Graceful Charity"),
+        (1, "Delinquent Duo"),
+        (1, "Heavy Storm"),
+        (1, "Mystical Space Typhoon"),
+        (1, "Snatch Steal"),
+        (1, "Premature Burial"),
+        (2, "Book of Moon"),
+        (2, "Nobleman of Crossout"),
+        (2, "Smashing Ground"),
+        (1, "Creature Swap"),
+        (1, "Mirror Force"),
+        (1, "Ring of Destruction"),
+        (1, "Torrential Tribute"),
+        (3, "Sakuretsu Armor"),
+        (2, "Dust Tornado"),
+    ),
+    side=(
+        # v1.1: -1 Exiled Force (Limited, already in the Main Deck), -1 Dust
+        # Tornado (Main Deck already runs 2 of 3), +1 King Tiger Wanghu,
+        # +1 Kinetic Soldier.
+        (3, "King Tiger Wanghu"),
+        (3, "Kinetic Soldier"),
+        (2, "Kycoo the Ghost Destroyer"),
+        (1, "D.D. Assailant"),
+        (1, "Dust Tornado"),
+        (2, "Royal Decree"),
+        (1, "Jinzo"),
+        (1, "Swords of Revealing Light"),
+        (1, "Ceasefire"),
+    ),
+    fusion_reference=None,
+)
+
+
+REFERENCE_DECKS: tuple[ReferenceDeck, ...] = (
+    CHAOS_CONTROL_V1,
+    WARRIOR_V1,
+    CHAOS_TURBO_V1,
+    CHAOS_WARRIOR_V1,
+    GOAT_CONTROL_V1,
+    PANDA_BURN_V1,
+    REASONING_GATE_TURBO_V1,
+    CHAOS_RETURN_V1,
+    SOUL_CONTROL_V1,
+    EARTH_BEAT_V1,
+)
+
+#: Decks 01-04 form the initial benchmark core; 05-10 are expansion decks.
+BENCHMARK_CORE: tuple[str, ...] = tuple(deck.id for deck in REFERENCE_DECKS[:4])
+EXPANSION: tuple[str, ...] = tuple(deck.id for deck in REFERENCE_DECKS[4:])
+
+
+def expand(entries: tuple[Entry, ...]) -> list[str]:
+    """Flatten ``(count, name)`` pairs into a repeated list of names."""
+
+    return [name for count, name in entries for _ in range(count)]

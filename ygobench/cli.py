@@ -11,9 +11,11 @@ import sys
 from pathlib import Path
 
 from ygobench.bench.eval_pipeline import EvalConfig, run_evaluation
+from ygobench.bench.goat_benchmark import CORE_DECKS
 from ygobench.bench.metrics import load_and_summarize, save_metrics
 from ygobench.config import PROJECT_ROOT, default_model_config, missing_api_key
 from ygobench.engine.upstream import UpstreamLayout
+from ygobench.formats import FORMATS
 
 
 def _add_model_args(parser: argparse.ArgumentParser) -> None:
@@ -39,6 +41,13 @@ def build_parser() -> argparse.ArgumentParser:
     duel.add_argument("--agent1", default="passive")
     duel.add_argument("--agent2", default="passive")
     duel.add_argument("--seed", type=int, default=0)
+    duel.add_argument("--format", dest="duel_format", choices=sorted(FORMATS), default=None)
+    duel.add_argument(
+        "--deck-root",
+        type=Path,
+        default=None,
+        help="Directory holding the .ydk files (defaults to resources/decks)",
+    )
     duel.add_argument(
         "--max-decisions",
         type=int,
@@ -52,6 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
     arena.add_argument("--seeds", nargs="+", type=int, default=[0])
     arena.add_argument("--max-decisions", type=int, default=2000)
     arena.add_argument("--run-name")
+    arena.add_argument("--format", dest="duel_format", choices=sorted(FORMATS), default=None)
+    arena.add_argument("--deck-root", type=Path, default=None)
+
+    goat = sub.add_parser("goat-bench", help="Run the GOAT benchmark matrix")
+    goat.add_argument("--decks", nargs="+", default=list(CORE_DECKS))
+    goat.add_argument("--agents", nargs="+", default=["passive", "random", "first_legal"])
+    goat.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
+    goat.add_argument("--max-decisions", type=int, default=4000)
+    goat.add_argument("--run-name")
+    goat.add_argument("--mirror-matches", action="store_true")
 
     evaluate = sub.add_parser("eval", help="Run puzzle benchmark evaluation")
     _add_model_args(evaluate)
@@ -149,6 +168,30 @@ def _eval(args: argparse.Namespace) -> int:
     return return_code
 
 
+def _goat_bench(args: argparse.Namespace) -> int:
+    from ygobench.bench.goat_benchmark import audit_replay, run_benchmark
+
+    result = run_benchmark(
+        decks=tuple(args.decks),
+        agents=tuple(args.agents),
+        seeds=tuple(args.seeds),
+        max_decisions=args.max_decisions,
+        run_name=args.run_name,
+        mirror_matches=args.mirror_matches,
+    )
+    problems = 0
+    for record in result.records:
+        if record.replay_path and not audit_replay(Path(record.replay_path))["ok"]:
+            problems += 1
+    print(f"duels        {len(result.records)}")
+    print(f"completed    {result.completed}")
+    print(f"failures     {len(result.failures)}")
+    print(f"stalls       {len(result.stalls)}")
+    print(f"audit issues {problems}")
+    print(f"artifacts    {result.run_dir}")
+    return 0 if not result.failures and not result.stalls and not problems else 1
+
+
 def _report(args: argparse.Namespace) -> int:
     metrics = load_and_summarize(args.summary, perspective=args.perspective)
     output = args.output or args.summary.with_name("metrics.json")
@@ -162,7 +205,7 @@ def _duel(args: argparse.Namespace) -> int:
     from ygobench.agents.factory import create_agent
     from ygobench.engine.full_duel import run_duel
 
-    deck_root = PROJECT_ROOT / "resources" / "decks"
+    deck_root = args.deck_root or PROJECT_ROOT / "resources" / "decks"
     deck1 = deck_root / f"{args.deck1}.ydk"
     deck2 = deck_root / f"{args.deck2}.ydk"
     missing = [str(path) for path in (deck1, deck2) if not path.is_file()]
@@ -177,6 +220,7 @@ def _duel(args: argparse.Namespace) -> int:
             agent2=create_agent(args.agent2, seed=args.seed * 2 + 1),
             seed=args.seed,
             max_decisions=args.max_decisions,
+            duel_format=args.duel_format,
         )
     except Exception as exc:
         print(f"Full duel failed: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -196,6 +240,8 @@ def _arena(args: argparse.Namespace) -> int:
                 seeds=tuple(args.seeds),
                 max_decisions=args.max_decisions,
                 run_name=args.run_name,
+                duel_format=args.duel_format,
+                deck_root=args.deck_root,
             )
         )
     except Exception as exc:
@@ -217,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
         return _duel(args)
     if args.command == "arena":
         return _arena(args)
+    if args.command == "goat-bench":
+        return _goat_bench(args)
     if args.command == "eval":
         return _eval(args)
     if args.command == "report":
